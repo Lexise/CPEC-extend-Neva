@@ -1,0 +1,17 @@
+in(X) :- not out(X), arg(X).
+out(X) :- not in(X), arg(X).
+:- in(X), in(Y), att(X,Y).
+rge(X) :- in(X).
+rge(Y) :- in(X),att(X,Y).
+nrge(X) :- not rge(X),arg(X).
+ok :- not rge(X), arg(X).
+lrge(X) : nrge(X) :- ok.
+lrge(X) :- rge(X), ok.
+ecl(X) | ecl(Z) : att(Z,X) :- lrge(X), ok.
+spoil :- ecl(X), ecl(Y), att(X,Y), ok.
+ecl(X) :- spoil, arg(X), ok.
+lrge(X) :- spoil, arg(X), ok.
+:- not spoil, ok.
+#show in/1.
+%nrge identifies arguments not in the range. Solutions containing nrge are not stable.
+#show nrge/1.

@@ -1,0 +1,45 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Alternative encoding for preferred extensions
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Guess a set S \subseteq A
+in(X) :- not out(X), arg(X).
+out(X) :- not in(X), arg(X).
+
+%% S has to be conflict-free
+:- in(X), in(Y), att(X,Y).
+
+%% The argument x is defeated by the set S
+defeated(X) :- in(Y), att(Y,X).
+
+% Arguments not defeated from outside extension
+not_defeated(X) :- out(X), not defeated(X).
+
+
+%% The argument x is not defended by S
+not_defended(X) :- att(Y,X), not defeated(Y).
+
+%% All arguments x \in S need to be defended by S (admissibility)
+:- in(X), not_defended(X).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Second part
+% Find an admissible set U containing at least one element not in S
+%   and not in conflict with S
+% The result is that S is not preferred, since S \cup U is admissible.
+% If you do not find it, then S is preferred
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+ecl(X) : out(X).
+% spoil :- ecl(X), ecl(Y), X!=Y.
+spoil | ecl(Z) : att(Z,Y) :- ecl(X), att(Y,X).
+spoil :- ecl(X), ecl(Y), att(X,Y).
+spoil :- in(X), ecl(Y), att(X,Y).
+ecl(X) :- spoil, arg(X).
+:- not spoil. 
+
+%% Show only the arguments in the computed preferred extension
+#show in/1.
+#show not_defeated/1.
+
