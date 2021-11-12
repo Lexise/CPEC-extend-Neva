@@ -1,13 +1,15 @@
 import dash
 import re
 import time
-
+import seaborn as sns
+import base64
 import dash_core_components as dcc
 import dash_bootstrap_components as dbc
 import dash_html_components as html
 import pandas as pd
 import random
 import io
+from multiprocessing import Process,Manager
 from clingo_asp_compute import compute_extensions
 from sklearn.model_selection import train_test_split
 from zipfile import ZipFile
@@ -15,13 +17,13 @@ from urllib.parse import quote as urlquote
 from file_manage import uploaded_files,get_current_processed_dir_semantic, save_file
 from control import WELL_COLOR_new
 import dash_table
-import os
+from ctypes import c_char_p
 import plotly.graph_objects as go
 from flask_caching import Cache
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory,request
 from clustering_correlation import compute_serial_matrix,innovative_correlation_clustering,my_optimal_leaf_ordering,abs_optimal_leaf_ordering
 import numpy as np
-from process_data import  process_data,clean_folder,get_color_label, find_feature_group, process_data_two_sets, addional_process_individual, process_extension_individual
+from process_data import  process_data,clean_folder,get_color_label, find_feature_group, process_data_two_sets, addional_process_individual, process_extension_individual,get_colors,find_semantic_files
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 import copy
 from dash.dependencies import Input, Output, State, ClientsideFunction
@@ -55,7 +57,7 @@ if not os.path.exists(ZIP_DIRECTORY):
 # print(p.read())
 
 
-app = dash.Dash(__name__, meta_tags=[{"name": "viewport", "content": "width=device-width"}])
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP],meta_tags=[{"name": "viewport", "content": "width=device-width"}])
 app.scripts.config.serve_locally=True
 app.css.config.serve_locally=True
 server = app.server
@@ -88,13 +90,27 @@ def download(path):
     else:
         return send_from_directory(DEFAULT_DATA, path, as_attachment=True)
 
+# @server.route("/")
+# def query_progress():
+#     name = request.args.get('name')
+#     print(name)
+#     with open('/tmp/data.txt', 'r') as f:
+#         data = f.read()
+#         records = json.loads(data)
+#         for record in records:
+#             if record['name'] == name:
+#                 return jsonify(record)
+#         return jsonify({'error': 'data not found'})
+
+
+
 app.config.suppress_callback_exceptions = True
 
 mapbox_access_token = "pk.eyJ1IjoiamFja2x1byIsImEiOiJjajNlcnh3MzEwMHZtMzNueGw3NWw5ZXF5In0.fk8k06T96Ml9CLGgKmk81w"
 layout = dict(
     autosize=True,
     automargin=True,
-    margin=dict(l=30, r=30, b=50, t=50),
+    margin=dict(l=10, r=10, b=20, t=20),
     hovermode="closest",
     plot_bgcolor="#F9F9F9",
     paper_bgcolor="#F9F9F9",
@@ -141,6 +157,13 @@ cache = Cache()
 cache.init_app(app.server, config=cache_config)
 
 TIMEOUT = 120
+df = pd.DataFrame(
+    {
+        "First Name": ["Arthur", "Ford", "Zaphod", "Trillian"],
+        "Last Name": ["Dent", "Prefect", "Beeblebrox", "Astra"],
+    }
+)
+
 
 
 
@@ -377,133 +400,138 @@ correlation_page= html.Div([
     ])
 
 main_page =     html.Div([
-    dcc.Store(id="aggregate_data"),
+
+    # dbc.DropdownMenu(
+    #     label="Visualization",
+    #     children=[
+    #         dbc.DropdownMenuItem("two dimension",id='dropdown-2d',),
+    #         dbc.DropdownMenuItem("three dimension",id='dropdown-3d',),
+    #         dbc.DropdownMenuItem("Item 3"),
+    #     ],
+    # ),
+
         # empty Div to trigger javascript file for graph resizing
     html.Div(id="output-clientside"),
-    html.Div(
-        [
-                html.Div(
-                    [
-                        html.A(
-                            html.Button("Get Default Data", id="get_default_data",
-                                        style={"color":"#FFFF","backgroundColor":"#2F8FD2"}),
-                            href="https://github.com/Lexise/ASP-Analysis/tree/master/data/default_raw_data",
-                        )
+    html.Div([
+        dcc.Dropdown(
+            id='visual-dropdown',
+            options=[
+                {'label': 'two dimension', 'value': 'dropdown-2d'},
+                {'label': 'three dimension', 'value': 'dropdown-3d'},
+                {'label': 'new processing', 'value': 'upload-user'},
+
+            ],
+            placeholder="Visualization",
+            style={'font-size': '14px', 'width': '20%','marginRight': '2%','marginTop': '2%'}
+        ),
+
+        #html.Br(),
+        dcc.Link(html.Button('Argument Analysis',
+                             style={'marginLeft': '2%','width': '30%', 'font-size': '14px', "color": "#FFFF", "backgroundColor": "#2F8FD2"}),
+                 href='/page-argument'),
+        # dcc.Link(html.Button('3D Analysis',style={'marginLeft': '2%','width': '32%','font-size':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-3d'),
+        dcc.Link(html.Button('Correlation Matrix',
+                             style={'marginLeft': '2%', 'width': '30%', 'font-size': '14px', "color": "#FFFF",
+                                    "backgroundColor": "#2F8FD2"}), href='/page-correlation'),
+    #html.Hr(),
+    ]
+    ),
+    # html.Div(
+    #     [
+    #             # html.Div(
+    #             #     [
+    #             #         html.A(
+    #             #             html.Button("Get Default Data", id="get_default_data",
+    #             #                         style={"color":"#FFFF","backgroundColor":"#2F8FD2"}),
+    #             #             href="https://github.com/Lexise/ASP-Analysis/tree/master/data/default_raw_data",
+    #             #         )
+    #             #     ],
+    #             #     #className="one-fifth column",
+    #             #     style={'width': '15%', 'textAlign': 'left'},
+    #             #     id="download_default",
+    #             # ),
+    #             # html.Div(
+    #             #     [
+    #             #         html.H2(
+    #             #             "NEVA",
+    #             #             style={"margin-bottom": "10px",'fontWeight': 'bold'},
+    #             #         ),
+    #             #         html.H5(
+    #             #             "Extension Visualization for Argumentation Frameworks", style={"margin-top": "0px"}
+    #             #         ),
+    #             #
+    #             #
+    #             #
+    #             #     ],
+    #             #
+    #             #     #className="one-half column",
+    #             #     id="title",
+    #             #     style={'width': '100%', 'textAlign': 'center'}
+    #             # ),
+    #             # html.Div(
+    #             #     [
+    #             #
+    #             #         dcc.Upload([html.Button("View/ Upload Processed Data" ,id="view_button",className="dcc_control")],id="view-processed-button",multiple=True),
+    #             #
+    #             #         dcc.ConfirmDialog(
+    #             #             id='confirm',
+    #             #             message='Do you want to visualize uploaded data?',
+    #             #         ),
+    #             #         html.Div(id='hidden-div', style={'display':'none'})
+    #             #         #html.A('Refresh', href='/')
+    #             #     ],
+    #             #     #className="one-fifth column",
+    #             #     style={'width': '15%', 'textAlign': 'right'},
+    #             #     id="button",
+    #             # ),
+    #
+    #
+    #
+    #     ],
+    #     id="header",
+    #     className="row flex-display",
+    #     style={"margin-bottom": "25px"},
+    #     ),
+
+
+
+
+
+
+    html.Div([
+
+
+                html.Div([
+                    dcc.Graph(
+                        id="scatter_groups",style={'display':'none'})
                     ],
-                    #className="one-fifth column",
-                    style={'width': '15%', 'textAlign': 'left'},
-                    id="download_default",
-                ),
-                html.Div(
-                    [
-                        html.H2(
-                            "NEVA",
-                            style={"margin-bottom": "10px",'fontWeight': 'bold'},
-                        ),
-                        html.H5(
-                            "Extension Visualization for Argumentation Frameworks", style={"margin-top": "0px"}
-                        ),
+                    className="bare_container"),
 
 
 
+
+                    html.Div([
+                    dcc.Graph(id="3d_scatter_cluster",className="row flex-display",style={'display':'none'}),
+                    dcc.Graph(id="3d_scatter_group", className="row flex-display",style={'display':'none'}),
                     ],
 
-                    #className="one-half column",
-                    id="title",
-                    style={'width': '100%', 'textAlign': 'center'}
-                ),
-                html.Div(
-                    [
-
-                        dcc.Upload([html.Button("View/ Upload Processed Data" ,id="view_button",style={"color":"#FFFF","backgroundColor":"#2F8FD2"})],id="view-processed-button",multiple=True),
-
-                        dcc.ConfirmDialog(
-                            id='confirm',
-                            message='Do you want to visualize uploaded data?',
-                        ),
-                        html.Div(id='hidden-div', style={'display':'none'})
-                        #html.A('Refresh', href='/')
-                    ],
-                    #className="one-fifth column",
-                    style={'width': '15%', 'textAlign': 'right'},
-                    id="button",
+                    className="flex-display"
                 ),
 
 
 
-        ],
-        id="header",
-        className="row flex-display",
-        style={"margin-bottom": "25px"},
+        ], className="flex-display",
+            style={'margin':dict(l=0, r=0, b=0, t=0)}
+        # parent_style={'flex-direction': 'column',
+        #                            '-webkit-flex-direction': 'column',
+        #                            '-ms-flex-direction': 'column',
+        #                           'display': 'flex'},
+        #vertical = True
+
         ),
 
 
 
-
-
-    #     # dcc.Graph(
-    #     #     id='compare_groups',
-    #     #     figure={
-    #     #         'data': [
-    #     #             {
-    #     #                 'x': prefer.position_x,
-    #     #                 'y': prefer.position_y,
-    #     #                 'text': ["clusters: {}".format(x) for x in prefer['cluster_label']],
-    #     #                 'name': 'prefer-',
-    #     #                 'mode': 'markers',
-    #     #                 'marker': {'size': 12}
-    #     #             },
-    #     #             {
-    #     #                 'x': stable.position_x,
-    #     #                 'y': stable.position_y,
-    #     #                 'text': ["clusters: {}".format(x) for x in stable['cluster_label']],
-    #     #                 'name': 'stable',
-    #     #                 'mode': 'markers',
-    #     #                 'marker': {'size': 12}
-    #     #             }
-    #     #         ],
-    #     #         'layout': {
-    #     #             'clickmode': 'event'
-    #     #         }
-    #     #     }
-    #     # ),
-    #     #
-    #
-    #
-    html.Div([
-
-        dcc.Tabs([
-            dcc.Tab(label='Scatter with Cluster', style={ 'fontWeight': 'bold'}, children=[
-                dcc.Graph(
-                    id="scatter_cluster",
-
-                ),
-            ]),
-
-
-            dcc.Tab(label='Scatter with Groups', style={ 'fontWeight': 'bold'}, children=[
-                dcc.Graph(
-                    id="scatter_groups",)
-
-
-                ]),
-
-            dcc.Tab(label='Feature Report',style={ 'fontWeight': 'bold'}, children=[
-                html.Div([
-                    html.Div(id="table1",
-                    className="pretty_container six columns"
-                    ),
-                    html.Div(
-                            id='table2',
-                            className="pretty_container seven columns"
-                    )
-                #html.Div(id="orders_table", className="row table-orders"),
-                    ],
-                    className="row flex-display"
-                ),
-
-            ]),
-        ]),
         html.Div([
             html.Div([
                 html.Span("Semantics:", style={"margin-top": "5%","font-weight": "bold"}),
@@ -552,132 +580,342 @@ main_page =     html.Div([
                 style={'marginLeft': '2%', 'width': '28%'},
             ),
 
+            html.Button(id='feature_semantic', children='semantics feature',className='middle-button',
+                        style={'marginTop':'1%','font-size': '14px', "color": "#000000", "backgroundColor": "#f0f0f0"}),
+            dbc.Tooltip(
+
+                id='feature_semantic_table',
+                target="feature_semantic",
+                style ={'font-size': '11px',"color": "#000000", "backgroundColor": "#f0f0f0"}
+            ),
+            html.Button(id='feature_cluster', children='clusters feature',className='middle-button',
+                        style={'marginTop':'1%','font-size': '14px','marginLeft': '3%', "color": "#000000", "backgroundColor": "#f0f0f0"}),
+
+            dbc.Tooltip(
+                id='feature_cluster_table',
+                target="feature_cluster",
+                style={'font-size': '11px', "color": "#000000", "backgroundColor": "#f0f0f0"}
+            ),
         ],
+            id='options-visualization',
+            style={'display':'none'},
             className="row flex-display"
         ),
 
+        html.Div(id='hover-data'),
 
-
-        ],
-        className = "pretty_container"),
-
-
-
-        html.Div(id='click-data'),
-        html.Br(),
-        dcc.Link(html.Button('Argument Analysis',style={'width': '32%','font-size':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-argument'),
-        dcc.Link(html.Button('3D Analysis',style={'marginLeft': '2%','width': '32%','font-size':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-3d'),
-        dcc.Link(html.Button('Correlation Matrix',style={'marginLeft': '2%', 'width': '32%','font-size':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-correlation'),
-        html.Hr(),
+        # html.Br(),
+        # dcc.Link(html.Button('Argument Analysis',style={'width': '32%','font-size':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-argument'),
+        # #dcc.Link(html.Button('3D Analysis',style={'marginLeft': '2%','width': '32%','font-size':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-3d'),
+        # dcc.Link(html.Button('Correlation Matrix',style={'marginLeft': '2%', 'width': '32%','font-size':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-correlation'),
+        # html.Hr(),
         html.Div([
+        dcc.Tabs([
+#html.Br(),
+            dcc.Tab(label='UPLOAD', children=[
+                html.Div(
+                    [
+                    html.Div([
+                        dcc.Upload([html.Button(children='UPLOAD APX', id="upload_button")], id="upload-data",
+                                   style={'width': '13%', 'marginLeft': '16%', 'marginTop': '1%', 'font-size': '15px',
+                                          'font-weight': 'bold', "color": "#FFFF",'marginRight': '10%'}, multiple=True),
+                        dcc.Upload([html.Button(children='UPLOAD Extensions', id="upload_ex_button")], id="upload-ex-data",
+                                   style={'width': '13%', 'marginLeft': '15%', 'marginTop': '1%', 'font-size': '15px',
+                                          'font-weight': 'bold', "color": "#FFFF"}, multiple=True),
+                    ],
+                    className = "row flex-display"),
+                    html.Div([
 
-            dcc.Upload([html.Button(children='UPLOAD APX',id="upload_button")], id="upload-data",style={'width': '13%','marginRight': '2.5%'},multiple=True ),
 
-            html.Span("Semantics:", style={"font-weight": "bold",'marginLeft': '0.5%'}),
+                        html.Div([html.P("Uploaded",className="dcc_control",style={"width":"80%",'textAlign': 'left'}),
+                        html.Button(id='clear-upload', n_clicks=0, children='Clear',style={'font-size':'11px','textAlign': 'left','marginRight': '1%'}),
+                        ],
+                        className = "row flex-display"   ),
 
-            # html.Div(
-            #     [
+                        html.Ul(id="file-list", children=get_file_name(UPLOAD_DIRECTORY))
+                        ],
+                    className="pretty_container",),
+
+                    #style={'border-radius': '15px'}),
+                     ],
+                className ='empty_container six columns',
+                ),
+                dcc.ConfirmDialog(
+                        id='stop_confirm',
+                        message='the corresponding extension size exceed our limitation (1G)',
+                    ),
+                html.Div([
+                    html.Div(
+                        [
+                    html.Span("Semantics:", style={"font-weight": "bold",'marginRight': '1%','marginLeft': '0.5%'}),
+
+
                     dcc.Dropdown(
-            id="check_semantics",
-            options=[
-                {'label': 'Preferred and Stable', 'value': 'preferred_stable'},
-                {'label': 'Stable and Stage', 'value': 'stable_stage'},
-                {'label': 'Stable and Stage2', 'value': 'stage2_stable'},
-                {'label': 'Stable and CF2', 'value': 'stable_cf2'},
-                {'label': 'Stage2 and CF2', 'value': 'cf2_stage2'},
-                {'label':"Semi-Stable and Preferred", 'value':'semi-stable_preferred'},
-                {'label':"Others", 'value':'others'}
+                    id="check_semantics",
+                    options=[
+                        {'label': 'Preferred and Stable', 'value': 'preferred_stable'},
+                        {'label': 'Stable and Stage', 'value': 'stable_stage'},
+                        {'label': 'Stable and Stage2', 'value': 'stage2_stable'},
+                        {'label': 'Stable and CF2', 'value': 'stable_cf2'},
+                        {'label': 'Stage2 and CF2', 'value': 'cf2_stage2'},
+                        {'label':"Semi-Stable and Preferred", 'value':'semi-stable_preferred'},
+                        {'label':"Others", 'value':'others'}
+                    ],
+                    #value=['preferred_stable'],
+                    placeholder="Select semantics pair",
+                    style={'height': '30px', 'width': '200px'}
+                    ) ,
+                    dcc.Store(id='memory-semantic'),
+                    #     ],
+                    # style={"width": "17%"},
+                    # ),
+                    html.Div(
+                        [
+                    # dcc.Checklist(
+                    #     id="check_semantics2",
+                    #     options=[
+                    #         {'label': 'Preferred ', 'value': 'preferred'},
+                    #         {'label': 'Stable', 'value': 'stable'},
+                    #         {'label': 'Stage', 'value': 'stage'},
+                    #         {'label': 'Stage2', 'value': 'stage2'},
+                    #         {'label': 'CF2', 'value': 'cf2'},
+                    #         {'label': "Semi-Stable", 'value': 'semi-stable'}
+                    #     ],
+                    #     value=[],
+                    #     labelStyle={'display': 'inline-block'},
+                    #    # style={'width': '17%'},
+                    #
+                    # ),
+
+                    dcc.Dropdown(
+                        id="check_semantics2",
+                        options=[
+                            {'label': 'Preferred ', 'value': 'preferred'},
+                            {'label': 'Stable', 'value': 'stable'},
+                            {'label': 'Stage', 'value': 'stage'},
+                            {'label': 'Stage2', 'value': 'stage2'},
+                            {'label': 'CF2', 'value': 'cf2'},
+                            {'label': "Semi-Stable", 'value': 'semi-stable'}
+                        ],
+                        placeholder="Select Semantics",
+                        #value=['MTL', 'NYC'],
+                        multi=True,
+                        style={'height': '30px', 'width': '200px'}
+                    )
+
+                        ],
+                    id="check_semantics2_style",
+
+                    style={"display": "none"},
+                    ),],
+                className="row flex-display"
+                ),
+                dbc.Tooltip(
+                    "you can choose one or two semantics",
+                    target="check_semantics2_style"),
+
+                dcc.Store(id="store-prev-comparisons"),
+                html.Br(),
+                html.Div([
+                    html.P("Eps:", style={"font-weight": "bold"}, className="dcc_control"),
+                    dcc.Input(id='eps', type="number", placeholder="1.7",style={'width': '22%','marginRight': '4%'}),
+                    dbc.Tooltip("DBscan  parameter, specifies the distance between two points to be considered within one cluster.suggested a decimal in range[1,3]", target="eps"),
+                    html.P("MinPts:", style={"font-weight": "bold"}, className="dcc_control"),
+                    dcc.Input(id='minpts',  type="number", placeholder="7",style={'width': '22%'}),#style={'width': '10%','marginRight': '0.5%'}
+                    dbc.Tooltip("DBscan parameter, the minimum number of points to form a cluster. suggested an integer in range[3,15]", target="minpts"),
+                ],
+
+                className="row flex-display"),
+                html.Br(),
+                html.Div([
+                    html.P("Cluster Num", style={"font-weight": "bold"}, className="dcc_control"),
+                    dcc.Input(id='cluster_num', type="number", placeholder="2"),
+                    dbc.Tooltip("Kmeans parameter, number of clusters, suggested an integer in range[2,15]", target="cluster_num"),
+                ],
+                className="row flex-display"),
+                html.Button(id='submit-button-state', n_clicks=0, children='Submit',className="middle-button",style={'font-size':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"})],
+                    className="empty_container five columns",
+
+                #className="pretty_container five columns",) style={'width': '32%','font-size':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}
+                )
             ],
-            value=['preferred_stable'],
-            placeholder="Select semantics",
-            style={'height': '30px', 'width': '200px'}
-            ) ,
-            dcc.Store(id='memory-semantic'),
-            #     ],
-            # style={"width": "17%"},
-            # ),
-            html.Div(
-                [
-            # dcc.Checklist(
-            #     id="check_semantics2",
-            #     options=[
-            #         {'label': 'Preferred ', 'value': 'preferred'},
-            #         {'label': 'Stable', 'value': 'stable'},
-            #         {'label': 'Stage', 'value': 'stage'},
-            #         {'label': 'Stage2', 'value': 'stage2'},
-            #         {'label': 'CF2', 'value': 'cf2'},
-            #         {'label': "Semi-Stable", 'value': 'semi-stable'}
-            #     ],
-            #     value=[],
-            #     labelStyle={'display': 'inline-block'},
-            #    # style={'width': '17%'},
-            #
-            # ),
-
-            dcc.Dropdown(
-                id="check_semantics2",
-                options=[
-                    {'label': 'Preferred ', 'value': 'preferred'},
-                    {'label': 'Stable', 'value': 'stable'},
-                    {'label': 'Stage', 'value': 'stage'},
-                    {'label': 'Stage2', 'value': 'stage2'},
-                    {'label': 'CF2', 'value': 'cf2'},
-                    {'label': "Semi-Stable", 'value': 'semi-stable'}
-                ],
-                placeholder="Select Semantics",
-                #value=['MTL', 'NYC'],
-                multi=True
-            )
-
-                ],
-            id="check_semantics2_style",
-
-            style={"display": "none"},
+            className="row flex-display"
             ),
-            dbc.Tooltip(
-                "you can choose one or two semantics",
-                target="check_semantics2_style"),
-
-            dcc.Store(id="store-prev-comparisons"),
-            dcc.Input(id='eps', type='text', value='Eps',style={'width': '10%','marginRight': '0.5%','marginLeft': '4%'}),
-            dbc.Tooltip("DBscan  parameter, specifies the distance between two points to be considered within one cluster.suggested a decimal in range[1,3]", target="eps"),
-            dcc.Input(id='minpts', type='text', value='MinPts',style={'width': '10%','marginRight': '0.5%'}),
-            dbc.Tooltip("DBscan parameter, the minimum number of points to form a cluster. suggested an integer in range[3,15]", target="minpts"),
-            dcc.Input(id='cluster_num', type='text', value='Cluster Num',style={'width': '11%','marginRight': '0.5%'}),
-            dbc.Tooltip("Kmeans parameter, number of clusters, suggested an integer in range[2,15]", target="cluster_num"),
-
-            html.Button(id='submit-button-state', n_clicks=0, children='Submit',style={'marginLeft': '0.5%','width': '9%','font-size':'13px',"color":"#FFFF","backgroundColor":"#2F8FD2"}),
-        ],
-        id="upload_block",
-        className="row flex-display"
-        ),
-
-        html.Br(),
-        html.Div([
-            html.Div([
+            # dcc.Tab(label='PROCESSED', children=[
+            #     html.Span("Semantics:", style={"font-weight": "bold",'marginLeft': '0.5%'}),
+            #
+            #     # html.Div(
+            #     #     [
+            #             dcc.Dropdown(
+            #     id="check_semantics",
+            #     options=[
+            #         {'label': 'Preferred and Stable', 'value': 'preferred_stable'},
+            #         {'label': 'Stable and Stage', 'value': 'stable_stage'},
+            #         {'label': 'Stable and Stage2', 'value': 'stage2_stable'},
+            #         {'label': 'Stable and CF2', 'value': 'stable_cf2'},
+            #         {'label': 'Stage2 and CF2', 'value': 'cf2_stage2'},
+            #         {'label':"Semi-Stable and Preferred", 'value':'semi-stable_preferred'},
+            #         {'label':"Others", 'value':'others'}
+            #     ],
+            #     value=['preferred_stable'],
+            #     placeholder="Select semantics",
+            #     style={'height': '30px', 'width': '200px'}
+            #     ) ,
+            #     dcc.Store(id='memory-semantic'),
+            #     #     ],
+            #     # style={"width": "17%"},
+            #     # ),
+            #     html.Div(
+            #         [
+            #     # dcc.Checklist(
+            #     #     id="check_semantics2",
+            #     #     options=[
+            #     #         {'label': 'Preferred ', 'value': 'preferred'},
+            #     #         {'label': 'Stable', 'value': 'stable'},
+            #     #         {'label': 'Stage', 'value': 'stage'},
+            #     #         {'label': 'Stage2', 'value': 'stage2'},
+            #     #         {'label': 'CF2', 'value': 'cf2'},
+            #     #         {'label': "Semi-Stable", 'value': 'semi-stable'}
+            #     #     ],
+            #     #     value=[],
+            #     #     labelStyle={'display': 'inline-block'},
+            #     #    # style={'width': '17%'},
+            #     #
+            #     # ),
+            #
+            #     dcc.Dropdown(
+            #         id="check_semantics2",
+            #         options=[
+            #             {'label': 'Preferred ', 'value': 'preferred'},
+            #             {'label': 'Stable', 'value': 'stable'},
+            #             {'label': 'Stage', 'value': 'stage'},
+            #             {'label': 'Stage2', 'value': 'stage2'},
+            #             {'label': 'CF2', 'value': 'cf2'},
+            #             {'label': "Semi-Stable", 'value': 'semi-stable'}
+            #         ],
+            #         placeholder="Select Semantics",
+            #         #value=['MTL', 'NYC'],
+            #         multi=True
+            #     )
+            #
+            #         ],
+            #     id="check_semantics2_style",
+            #
+            #     style={"display": "none"},
+            #     ),
+            #     dbc.Tooltip(
+            #         "you can choose one or two semantics",
+            #         target="check_semantics2_style"),
+            #
+            #     dcc.Store(id="store-prev-comparisons"),
+            #     dcc.Input(id='eps', type='text', value='Eps',style={'width': '10%','marginRight': '0.5%','marginLeft': '4%'}),
+            #     dbc.Tooltip("DBscan  parameter, specifies the distance between two points to be considered within one cluster.suggested a decimal in range[1,3]", target="eps"),
+            #     dcc.Input(id='minpts', type='text', value='MinPts',style={'width': '10%','marginRight': '0.5%'}),
+            #     dbc.Tooltip("DBscan parameter, the minimum number of points to form a cluster. suggested an integer in range[3,15]", target="minpts"),
+            #     dcc.Input(id='cluster_num', type='text', value='Cluster Num',style={'width': '11%','marginRight': '0.5%'}),
+            #     dbc.Tooltip("Kmeans parameter, number of clusters, suggested an integer in range[2,15]", target="cluster_num"),
+            #
+            #     html.Button(id='submit-button-state', n_clicks=0, children='Submit',className="learn-more-button"),]),
+            dcc.Tab(label='PROCESSED', children=[
 
                 html.Div([
-                    html.P("Upload",className="dcc_control",style={"width":"91%",'textAlign': 'left'}),
-                    html.Button(id='clear-upload', n_clicks=0, children='Clear',style={'width': '12%','font-size':'11px','textAlign': 'right'}),
+                            html.P("Derived Extensions"),
+                            html.Ul(id="extension-list", children=get_file_name(EXTENSION_DIR))
+                        ],
+                            className="pretty_container four columns"),
+                html.Div([
+                            html.P("Processed Documents"),
+                            html.Ul(id="processed-list", children=get_file_name(ZIP_DIRECTORY))
+                        ],
+                            className="pretty_container four columns"),
 
+
+
+                html.Div(
+                [
+                    # html.Div(
+                    #     [
+                    html.A(
+                        html.Button("Get Default Data", id="get_default_data",className="middle-button",
+                                    style={"color":"#FFFF","backgroundColor":"#2F8FD2"}),
+                        href="https://github.com/Lexise/ASP-Analysis/tree/master/data/default_raw_data",
+                    ),
+                    #     ],
+                    #     #className="one-fifth column",
+                    #     style={'width': '15%', 'textAlign': 'left'},
+                    #     id="download_default",
+                    # ),
+                    dcc.Upload([html.Button("Upload Processed Data" ,id="view_button",className="middle-button")],id="view-processed-button",multiple=True),
+
+                    dcc.ConfirmDialog(
+                        id='confirm',
+                        message='Do you want to visualize uploaded data?',
+                    ),
+                    html.Div(id='hidden-div', style={'display':'none'})
+                    #html.A('Refresh', href='/')
                 ],
-                    className="row flex-display",
-                    #style={'textAlign': 'right'}
+                className="one-fifth column",
+                #style={'width': '15%', 'textAlign': 'right'},
+                id="button",
                 ),
-                html.Ul(id="file-list", children=get_file_name(UPLOAD_DIRECTORY))
-            ],
-                className="pretty_container seven columns"),
+             ],
+             className="row flex-display"       ),
 
-            html.Div([
-                html.P("Processed"),
-                html.Ul(id="processed-list", children=get_file_name(ZIP_DIRECTORY))
-            ],
-                className="pretty_container seven columns")
-        ],
-            className="row flex-display"
+
+        ]),
+
+        html.Div([
+            html.Br(),
+            dbc.Progress(
+                [
+                    dbc.Progress(id="progress-extension", children="extension computing", value=20, color="success",
+                                 bar=True, animated=False),
+                    dbc.Progress(id='progress-process', children="data processing", value=30, color="warning",
+                                 bar=True, animated=False),
+                    dbc.Progress(value=20, color="danger", bar=True, animated=False),
+                ],
+                multi=True,
+            )],
+
         )
 
-    ])
+        ],
+        id="upload_block",
+        style={'display':'none'},
+        className="my_container"
+        ),
+
+
+        #html.Br(),
+        # html.Div([
+        #     html.Div([
+        #
+        #         html.Div([
+        #             html.P("Upload",className="dcc_control",style={"width":"91%",'textAlign': 'left'}),
+        #             html.Button(id='clear-upload', n_clicks=0, children='Clear',style={'width': '12%','font-size':'11px','textAlign': 'right'}),
+        #
+        #         ],
+        #             className="row flex-display",
+        #             #style={'textAlign': 'right'}
+        #         ),
+        #         html.Ul(id="file-list", children=get_file_name(UPLOAD_DIRECTORY))
+        #     ],
+        #         className="pretty_container seven columns"),
+        #
+        #     html.Div([
+        #         html.P("Processed"),
+        #         html.Ul(id="processed-list", children=get_file_name(ZIP_DIRECTORY))
+        #     ],
+        #         className="pretty_container seven columns")
+        # ],
+        #     className="row flex-display"
+        # )
+
+        ],
+    className='my_main_container',
+    #style={'height': '100%'}
+)
+
 
 
 
@@ -686,12 +924,12 @@ main_page =     html.Div([
 
 ThreeD_analysis=html.Div([
                 dcc.Link(html.Button('back'), href='/'),
-                html.Div([
-                    dcc.Graph(id="3d_scatter_cluster",className="row flex-display"),
-                    dcc.Graph(id="3d_scatter_group", className="row flex-display"),
-                    ],
-                    className="row flex-display"
-                ),
+                # html.Div([
+                #     dcc.Graph(id="3d_scatter_cluster",className="row flex-display"),
+                #     dcc.Graph(id="3d_scatter_group", className="row flex-display"),
+                #     ],
+                #     className="row flex-display"
+                # ),
                     html.Div([
 
                         html.Div([
@@ -730,7 +968,7 @@ ThreeD_analysis=html.Div([
                         ],
                         className = "row flex-display"),
                     ],
-                className="pretty_container")
+                )
 
 app.layout = html.Div([
 
@@ -746,8 +984,9 @@ app.layout = html.Div([
     ),
 
 ],
-    id="mainContainer",
-    style={"display": "flex", "flex-direction": "column"},
+    #className='my_main_container',
+     style={'height':'100vh', 'margin':dict(l=0, r=0, b=0, t=0)}
+    #style={"display": "flex", "flex-direction": "column"},
 )
 
 
@@ -758,11 +997,14 @@ def global_individual(eps, minpts, n_cluster, semantics):
     question = ""
     try:
         apx_files = []
+        extensions=[]
         for x in files:
             if x.endswith('.apx'):
                 # Assume that the user uploaded a CSV file
                 question = x
                 apx_files.append(x)
+            else:
+                extensions.append(x)
 
 
     except Exception as e:
@@ -772,9 +1014,20 @@ def global_individual(eps, minpts, n_cluster, semantics):
         ])
         # zipname=files[0].strip("apx")+"zip"
     try:
-        print('cleaned:', clean_folder(PROCESSED_DIRECTORY))
-        process_extension_individual(question, semantics,PROCESSED_DIRECTORY, UPLOAD_DIRECTORY, EXTENSION_DIR, eps, minpts, n_cluster)
-        addional_process_individual(PROCESSED_DIRECTORY,semantics)
+       print('cleaned:', clean_folder(PROCESSED_DIRECTORY))
+       for a_semantic in semantics:
+          extension=find_semantic_files(extensions,a_semantic)
+          if len(extensions) == 0:
+              process_extension_individual(question, a_semantic, PROCESSED_DIRECTORY, UPLOAD_DIRECTORY,
+                                           EXTENSION_DIR, eps,
+                                           minpts, n_cluster)
+              process_data_two_sets(PROCESSED_DIRECTORY, UPLOAD_DIRECTORY + question, EXTENSION_DIR + extension, eps, minpts,
+                                  n_cluster, a_semantic)
+          else:
+              process_data_two_sets(PROCESSED_DIRECTORY, UPLOAD_DIRECTORY + question, UPLOAD_DIRECTORY + extension, eps,
+                                    minpts,
+                                    n_cluster, a_semantic)
+       addional_process_individual(PROCESSED_DIRECTORY,semantics)
     except Exception as e:
         print('error:',e)
         return html.Div([
@@ -859,12 +1112,17 @@ def global_store(eps, minpts, n_cluster, semantics):
         elif "semi-stable_preferred" in semantics:
             pass
         extension_file="{}.EE_{}".format(question, end)
+        #manager = Manager()
+        # string = []
+        # P = Process(target=compute_extensions, args=(UPLOAD_DIRECTORY +question,asp_encoding,EXTENSION_DIR+extension_file,string))
+        #
+        # P.start()
+        compute_extension_result=compute_extensions(UPLOAD_DIRECTORY +question,asp_encoding,EXTENSION_DIR+extension_file)
+        #print("done\n : string is ",string)
+        if compute_extension_result=='oversize': #len(string) >0 and string[0]=='oversize':
+            return 'oversize'
 
-        compute_extensions(UPLOAD_DIRECTORY +question,asp_encoding,EXTENSION_DIR+extension_file)
-        # os.system(
-        #     "D:/test2/clingo-4.5.4-win64/clingo.exe {} data/app_uploaded_files/{} 0 > data/extension_sets/{}".format(asp_encoding,question,extension_file))
-        # # os.system("D:/test2/clingo-4.5.4-win64/clingo.exe stage-cond-disj.dl data/app_uploaded_files/long-island-railroad_20090825_0512.gml.20.apx 0 > data/processed_zip/long-island-railroad_20090825_0512.gml.20.apx.EE_STG"
-        #   )
+
     except Exception as e:
         print('error:',e)
         return html.Div([
@@ -881,6 +1139,8 @@ def global_store(eps, minpts, n_cluster, semantics):
         #process_data(PROCESSED_DIRECTORY, UPLOAD_DIRECTORY + question, UPLOAD_DIRECTORY + stg_answer, eps, minpts, n_cluster)
 
         print("(whole)get processed data", time.process_time() - start_time) #time.time() - start_time)
+        if compute_extension_result == 'finished':
+            return 'finished'
     else:
         print("the form of input file is not correct.")
 
@@ -894,18 +1154,18 @@ def global_store(eps, minpts, n_cluster, semantics):
 #     if n:
 #         return not is_open
 #     return is_open
-@app.callback(Output('check_semantics2_style', 'style') ,Input("check_semantics", "value"))
+@app.callback(Output('check_semantics2_style', 'style') ,[Input("check_semantics", "value")])
 def show_other_option(semantics):
     if semantics=="others":
         return {'display': 'block', 'width': '17%','marginLeft': '0.5%'}
 
     return {'display': 'none'}
 
-@app.callback([Output('signal', 'children'),Output('memory-semantic', 'data')] ,[Input('submit-button-state', 'n_clicks'),Input("check_semantics", "value")],
+@app.callback([Output('signal', 'children'),Output('memory-semantic', 'data'),] ,[Input('submit-button-state', 'n_clicks'),Input("check_semantics", "value")],
               [State('eps', 'value'), State('minpts', 'value'), State('cluster_num', 'value'),State('store-prev-comparisons', 'data')])
 def compute_value( n_clicks, semantics,  eps, minpts, n_cluster,semantics2):
     # compute value and send a signal when done
-    print("store data: ",semantics2)
+    print("clickes1: ",n_clicks)
     if len(os.listdir(UPLOAD_DIRECTORY)) == 0:
         print("return no content")
         return "", None   #haven't upload data
@@ -926,9 +1186,10 @@ def compute_value( n_clicks, semantics,  eps, minpts, n_cluster,semantics2):
 
 
 @app.callback([Output('store-prev-comparisons', 'data')],
-                     [Input('check_semantics2', 'value'),Input('submit-button-state', 'n_clicks'),],
+                     [Input('check_semantics2', 'value'),Input('submit-button-state', 'n_clicks')],
                      [State('store-prev-comparisons', 'data')])
 def select_comparison(comparisons, submit_click, prev_comparisons):
+  print('clicks3:',submit_click)
   if comparisons is None:  # on page load
     raise dash.exceptions.PreventUpdate
   if submit_click==0:
@@ -955,10 +1216,10 @@ def select_comparison(comparisons, submit_click, prev_comparisons):
 
 @app.callback(
     Output("file-list", "children"),
-    [Input("clear-upload","n_clicks"), Input('signal', 'children'),Input('upload-data', 'filename'),],
-    [State('upload-data', 'contents')]
+    [Input("clear-upload","n_clicks"), Input('signal', 'children'),Input('upload-data', 'filename'),Input('upload-ex-data', 'filename')],
+    [State('upload-data', 'contents'),State('upload-ex-data', 'contents')]
 )
-def update_output(clear_click,children,uploaded_filenames, uploaded_file_contents ):
+def update_output(clear_click,children,uploaded_filenames,uploaded_ex_filenames, uploaded_file_contents,uploaded_ex_file_contents ):
     """Save uploaded files and regenerate the file list."""
     changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
     if len(os.listdir(UPLOAD_DIRECTORY)) != 0 and 'clear-upload' in changed_id:#and n_click==None:
@@ -966,6 +1227,11 @@ def update_output(clear_click,children,uploaded_filenames, uploaded_file_content
             return ""
 
     if uploaded_filenames is not None and uploaded_file_contents is not None:
+            for name, data in zip(uploaded_filenames, uploaded_file_contents):#[],[]
+                save_file(name, data, UPLOAD_DIRECTORY)
+                #save_file(name, data, EXTENSION_DIR)
+
+    if uploaded_ex_filenames is not None and uploaded_ex_file_contents is not None:
             for name, data in zip(uploaded_filenames, uploaded_file_contents):#[],[]
                 save_file(name, data, UPLOAD_DIRECTORY)
 
@@ -998,9 +1264,28 @@ def display_page(pathname):
 
 
 @app.callback(
-    Output('click-data', 'children'),
-    [Input('scatter_cluster', 'clickData'),Input('scatter_groups', 'clickData'),Input("clustering-method", "value"),Input('confirm', 'submit_n_clicks')])
-def display_click_data(clickData1,clickData2, method,n_click):
+    Output('3d_scatter_group', 'hoverData'),
+    [Input('3d_scatter_cluster', 'hoverData')]) #Input('scatter_cluster', 'hoverData'),
+def connect_hover(hover_data):
+    changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
+    if hover_data:
+        if "3d_scatter_cluster" in changed_id:
+            print("hover data:", hover_data)
+            #selected_id=hover_data['points'][0]['customdata']
+
+            selected_point_info=hover_data["points"][0]
+            print("selected id:", selected_point_info)
+            if len(selected_point_info)==1:
+                return None
+            selected_point_id=selected_point_info["customdata"]
+            return hover_data
+
+@app.callback(
+    Output('hover-data', 'children'),
+    [Input("visual-dropdown","value"),Input('scatter_groups', 'hoverData'),Input("clustering-method", "value"),Input('confirm', 'submit_n_clicks')]) #Input('scatter_cluster', 'hoverData'),
+def display_click_data(drop_selection, clickData2, method,n_click):
+    if drop_selection and drop_selection=='upload-user':
+        return None
     changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
     if len(os.listdir(PROCESSED_DIRECTORY)) == 12: # or len(os.listdir(PROCESSED_DIRECTORY)) == 5:
            processed_data = pd.read_pickle(PROCESSED_DIRECTORY + "CombinedProcessed_data.pkl")
@@ -1018,39 +1303,44 @@ def display_click_data(clickData1,clickData2, method,n_click):
     cluster_label = method + "_cluster_label"
 
     print("changed_id:",[p['prop_id'] for p in dash.callback_context.triggered])
-    if clickData1 or clickData2:
-        if "scatter_cluster" in changed_id:
-            clickData=clickData1
-            print("clickData1",clickData1)
-        elif "scatter_groups" in changed_id:
-            clickData = clickData2
-        else:
-            return None
-        print("clickData2", clickData2)
-        selected_point_id=clickData["points"][0]["customdata"]
-        print("clickData:",clickData)
-        selected_point=processed_data[processed_data.id==selected_point_id]
-        selected_point_arg=','.join(str(x) for x in selected_point.arg)
+    # if clickData1 or clickData2:
+    #     if "scatter_cluster" in changed_id:
+    #         clickData=clickData1
+    #         print("clickData1",clickData1)
+    #     elif "scatter_groups" in changed_id:
+    #         clickData = clickData2
+    #     else:
+    #         return None
+    if clickData2:
+        if "scatter_groups" in changed_id:
+            print("clickData2", clickData2)
+            selected_point_info=clickData2["points"][0]
+            if len(selected_point_info)==1:
+                return None
+            selected_point_id=selected_point_info["customdata"]
 
-        selected_point_cluster=selected_point[cluster_label]
-        return html.Div([
-                html.Table([
-                    html.Tr([html.Th('Id'),
-                             html.Th('Cluster'),
-                             html.Th('Groups'),
-                             html.Th('Arguments'),
-                             # html.Th('Most Recent Click')
-                             ]),
-                             html.Tr([html.Td(selected_point_id),
-                                      html.Td(selected_point_cluster),
-                                      html.Td(selected_point[label]),
-                                      html.Td(selected_point_arg.strip('[]')),
-                                      # html.Td(button_id)
-                                      ])
-                             ],
-                )
-                ],
-        className = "pretty_container")
+            selected_point=processed_data[processed_data.id==selected_point_id]
+            selected_point_arg=','.join(str(x) for x in selected_point.arg)
+
+            selected_point_cluster=selected_point[cluster_label]
+            return html.Div([
+                    html.Table([
+                        html.Tr([html.Th('Id'),
+                                 html.Th('Cluster'),
+                                 html.Th('Groups'),
+                                 html.Th('Arguments'),
+                                 # html.Th('Most Recent Click')
+                                 ]),
+                                 html.Tr([html.Td(selected_point_id),
+                                          html.Td(selected_point_cluster),
+                                          html.Td(selected_point[label]),
+                                          html.Td(selected_point_arg.strip('[]')),
+                                          # html.Td(button_id)
+                                          ])
+                                 ],
+                    )
+                    ],
+            className = "pretty_container")
     return None
 
 
@@ -1172,25 +1462,36 @@ def generate_tabs1( content, reduction1,  method, n_click,semantic, present_sema
     #             )]
 
 
-
-
-
-
-
-
-@app.callback(Output('scatter_groups', 'figure'),
+@app.callback([Output('scatter_groups', 'figure'),Output('scatter_groups', 'style'),
+               Output('3d_scatter_cluster', 'figure'),Output('3d_scatter_group', 'figure'),Output('3d_scatter_cluster', 'style'),Output('3d_scatter_group', 'style'),
+               Output('upload_block','style'), Output('options-visualization','style')],
               [Input('signal', 'children'),
+               Input('visual-dropdown', 'value'),
+
                Input("dimensional-reduction1", "value"),
-               #Input("clustering-method", "value"),
-               Input('confirm', 'submit_n_clicks'),
-               Input('memory-semantic', 'data')],
-               # [State('check_semantics', 'value')]
+               Input("clustering-method", "value"),
+               Input('confirm', 'submit_n_clicks')]
+               #Input('memory-semantic', 'data')],
 
               )
-# @cache.memoize(TIMEOUT)
-def generate_tabs2(content, reduction2, n_click, semantic):  # method):
+def generate_tabs(content, selected_visual, reduction2, cluster_method, n_click):
+            if selected_visual=='dropdown-2d':
+                fig=generate_tabs2(content,reduction2, cluster_method, n_click)
+                return fig,{'display':'block'},{},{},{'display':'none'},{'display':'none'},{'display':'none'},{'display':'flex','position': 'relative' }
+            elif selected_visual=='dropdown-3d':
+                fig1,fig2=display3d(reduction2, cluster_method)
+                return {},{'display':'none'},fig1,fig2,{'display':'block'},{'display':'block'},{'display':'none'},{'display':'flex','position': 'relative' }
+            elif selected_visual=='upload-user':
+                return {},{'display':'none'},{}, {},{'display':'none'},{'display':'none'},{'display':'block'},{'display':'none'}
+            else:
+                raise dash.exceptions.PreventUpdate#return {},{'display':'none'},{}, {},{'display':'none'},{'display':'none'}
 
-    if  len(os.listdir(PROCESSED_DIRECTORY)) == 12: #or semantic =="cf2_stage2":
+
+
+# @cache.memoize(TIMEOUT)
+def generate_tabs2(content, reduction2, method, n_click):  # method):
+
+    if len(os.listdir(PROCESSED_DIRECTORY)) == 12: #or semantic =="cf2_stage2":
 
         color_label="category"
         processed_data=pd.read_pickle(PROCESSED_DIRECTORY + "CombinedProcessed_data.pkl")#pd.concat([present_data1,present_data2,present_common])
@@ -1230,10 +1531,12 @@ def generate_tabs2(content, reduction2, n_click, semantic):  # method):
 
         # remove hover, provide an extra table to show the arg information of selected data point
 
-
-    groups_set = processed_data[color_label].unique()
-    get_color_label(processed_data,color_label,groups_set)
     fig = go.Figure()
+
+    # 加点（group points）
+    groups_set = np.sort(processed_data[color_label].unique())
+    get_color_label(processed_data, color_label, groups_set)
+
     for x in groups_set:
         fig.add_trace(go.Scatter(
             x=processed_data[processed_data[color_label] == x][x_axe],
@@ -1242,94 +1545,161 @@ def generate_tabs2(content, reduction2, n_click, semantic):  # method):
             mode='markers',
             name=str(x),
             hoverinfo="none",
-            # marker=dict(
-            #     symbol=x
-            # ),
             marker=dict(
+                size=15,
                 color=processed_data[processed_data[color_label] == x]['color'],
-
-                ),
+                # colorscale='Viridis',
+                opacity=0.06
+            ),
+            # marker=dict(
+            #     color=processed_data[processed_data[color_label] == x]['color'],
+            #
+            # ),
             showlegend=True
         ))
+
+    # Add shapes
+    cluster_label = method + "_cluster_label"
+    processed_data[cluster_label] = ["Cluster " + str(a) for a in processed_data[cluster_label]]
+    cluster_set = list(processed_data[cluster_label].unique())
+#    colors=get_colors(len(cluster_set))#['blue','red','green','yellow']
+    num_color=len(cluster_set)
+    if num_color>25:
+        colors=get_colors(len(cluster_set))#['rgb'+str(x) for x in sns.color_palette(n_colors=len(cluster_set))]
+    else:
+        colors=[WELL_COLOR_new[i] for i in range(num_color)]
+    for clabel in cluster_set:
+        select=processed_data[processed_data[cluster_label] == clabel]
+        x_list = select[x_axe]
+        y_list = select[y_axe]
+        # fig.add_shape(type="circle",
+        #               xref="x", yref="y",
+        #               x0=x_list.min(), y0=y_list.min(),
+        #               x1=x_list.max(), y1=y_list.max(),
+        #               opacity=0.3,
+        #               layer="below",
+        #               fillcolor=colors[cluster_set.index(clabel)],
+        #               line_color=colors[cluster_set.index(clabel)],
+        #               name='cluster'+str(clabel)
+        #               )
+        fig.add_trace(
+            go.Scatter(
+                x=x_list,
+                y=y_list,
+                #fill="toself",
+                mode='markers',
+
+                # marker=dict(
+                #                   size=15,
+                #                   color=colors[cluster_set.index(clabel)],
+                #     #colorscale='Viridis',
+                #     opacity=0.06
+                # ),
+                marker=dict(
+                    #size=4,
+                    color=colors[cluster_set.index(clabel)],
+
+                ),
+                customdata=select["id"],
+                name=clabel,
+                line_color=colors[cluster_set.index(clabel)],
+                #text=clabel,
+
+            )
+        )
+
+
+
     fig.update_layout(xaxis={'showgrid': False, 'visible': False, },
                       yaxis={'showgrid': False, 'visible': False, },
                       plot_bgcolor='rgba(0,0,0,0)',
-                      clickmode='event+select')
-    return fig
+                      clickmode='event+select',  # autosize=True
+
+                      width=1500,
+                      height=700,
+                      autosize=False,
+                      margin={'t':0,'l':0,'r':0,'b':0},
+
+                      )
 
 
-@app.callback([ Output('table1', 'children'),
-               Output('table2', 'children')],
-              [Input('signal', 'children'),
-               Input("clustering-method", "value"),
-               Input('confirm', 'submit_n_clicks'),Input("semantic-method-1", "value"),])
-# @cache.memoize(TIMEOUT)
-def generate_tabs3(content,   cluster_method,
-                   n_click, table_method):  # processed_data, table1_data,table2_data ):
-    if len(os.listdir(PROCESSED_DIRECTORY)) == 12:
-        group_table = pd.read_pickle(PROCESSED_DIRECTORY + "group_feature.pkl")
-        # semantics=get_current_processed_dir_semantic(PROCESSED_DIRECTORY)
-        # if table_method not in semantics:
-        #     cluster_table = pd.read_pickle(
-        #         PROCESSED_DIRECTORY + semantics[0] + "_" + cluster_method + "_cluster_feature.pkl")
-        # else:
-        #     cluster_table = pd.read_pickle(PROCESSED_DIRECTORY + table_method+ "_"+cluster_method+ "_cluster_feature.pkl")
-        cluster_table = pd.read_pickle(
-            PROCESSED_DIRECTORY + table_method + "_" + cluster_method + "_cluster_feature.pkl")
-    elif len(os.listdir(PROCESSED_DIRECTORY)) == 6 or n_click:  # load and processed
 
-            group_table = pd.read_pickle(PROCESSED_DIRECTORY + "group_feature.pkl")
-            cluster_table = pd.read_pickle(PROCESSED_DIRECTORY +  cluster_method + "_cluster_feature.pkl")
+    return fig#, {'display': 'block'}
 
 
-    else:
-            group_table = pd.read_pickle(DEFAULT_DATA+"group_feature.pkl")
-            if cluster_method == "km":
-                cluster_table = pd.read_pickle(DEFAULT_DATA+"km_cluster_feature.pkl")
-            else:
-                cluster_table = pd.read_pickle(DEFAULT_DATA+"db_cluster_feature.pkl")
 
-
-    # table
-    if len(group_table) == 0:
-        table1 = html.H5("No group feature")
-    else:
-        table1 = dash_table.DataTable(
-            data=group_table.to_dict('records'),
-            columns=[{"name": i, "id": i} for i in group_table.columns],
-            style_table={
-                'maxHeight': '300px',
-                'overflowY': 'scroll'
-            },
-            style_header={
-                'fontWeight': 'bold'
-            },
-            style_cell={
-                'font_size': '20px',
-                'text_align': 'center'
-            },
-        )
-
-    if not len(cluster_table):
-        table2 = html.H5("No cluster Feature")
-    else:
-        table2 = dash_table.DataTable(
-            data=cluster_table.to_dict('records'),
-            columns=[{"name": i, "id": i} for i in cluster_table.columns],
-
-            style_table={
-                'maxHeight': '300px',
-                'overflowY': 'scroll'
-            },
-            style_header={
-                'fontWeight': 'bold'
-            },
-            style_cell={
-                'font_size': '20px',
-                'text_align': 'center'
-            },
-        )
-    return  table1, table2
+# @app.callback([ Output('table1', 'children'),
+#                Output('table2', 'children')],
+#               [Input('signal', 'children'),
+#                Input("clustering-method", "value"),
+#                Input('confirm', 'submit_n_clicks'),Input("semantic-method-1", "value"),])
+# # @cache.memoize(TIMEOUT)
+# def generate_tabs3(content,   cluster_method,
+#                    n_click, table_method):  # processed_data, table1_data,table2_data ):
+#     if len(os.listdir(PROCESSED_DIRECTORY)) == 12:
+#         group_table = pd.read_pickle(PROCESSED_DIRECTORY + "group_feature.pkl")
+#         # semantics=get_current_processed_dir_semantic(PROCESSED_DIRECTORY)
+#         # if table_method not in semantics:
+#         #     cluster_table = pd.read_pickle(
+#         #         PROCESSED_DIRECTORY + semantics[0] + "_" + cluster_method + "_cluster_feature.pkl")
+#         # else:
+#         #     cluster_table = pd.read_pickle(PROCESSED_DIRECTORY + table_method+ "_"+cluster_method+ "_cluster_feature.pkl")
+#         cluster_table = pd.read_pickle(
+#             PROCESSED_DIRECTORY + table_method + "_" + cluster_method + "_cluster_feature.pkl")
+#     elif len(os.listdir(PROCESSED_DIRECTORY)) == 6 or n_click:  # load and processed
+#
+#             group_table = pd.read_pickle(PROCESSED_DIRECTORY + "group_feature.pkl")
+#             cluster_table = pd.read_pickle(PROCESSED_DIRECTORY +  cluster_method + "_cluster_feature.pkl")
+#
+#
+#     else:
+#             group_table = pd.read_pickle(DEFAULT_DATA+"group_feature.pkl")
+#             if cluster_method == "km":
+#                 cluster_table = pd.read_pickle(DEFAULT_DATA+"km_cluster_feature.pkl")
+#             else:
+#                 cluster_table = pd.read_pickle(DEFAULT_DATA+"db_cluster_feature.pkl")
+#
+#
+#     # table
+#     if len(group_table) == 0:
+#         table1 = html.H5("No group feature")
+#     else:
+#         table1 = dash_table.DataTable(
+#             data=group_table.to_dict('records'),
+#             columns=[{"name": i, "id": i} for i in group_table.columns],
+#             style_table={
+#                 'maxHeight': '300px',
+#                 'overflowY': 'scroll'
+#             },
+#             style_header={
+#                 'fontWeight': 'bold'
+#             },
+#             style_cell={
+#                 'font_size': '20px',
+#                 'text_align': 'center'
+#             },
+#         )
+#
+#     if not len(cluster_table):
+#         table2 = html.H5("No cluster Feature")
+#     else:
+#         table2 = dash_table.DataTable(
+#             data=cluster_table.to_dict('records'),
+#             columns=[{"name": i, "id": i} for i in cluster_table.columns],
+#
+#             style_table={
+#                 'maxHeight': '300px',
+#                 'overflowY': 'scroll'
+#             },
+#             style_header={
+#                 'fontWeight': 'bold'
+#             },
+#             style_cell={
+#                 'font_size': '20px',
+#                 'text_align': 'center'
+#             },
+#         )
+#     return  table1, table2
 
 
 @app.callback(
@@ -1437,6 +1807,21 @@ def set_bar_figure(argument_data, valuelist):
 #     zip_obj.extractall(PROCESSED_DIRECTORY)
 #     return [True]
 
+@app.callback([Output("stop_confirm", "displayed"),Output("progress-extension", "animated"),Output("progress-process", "animated")] ,  #should be style
+       [Input('submit-button-state', 'n_clicks'), Input("signal","children")],
+              )
+def show_confirm(n_clicks,value,semantics,state):
+    print('clicks2',n_clicks)
+    if n_clicks>0:
+        if value=='oversize':
+            return True, False, False
+        elif value=='finished':
+            return False, False, True
+        else:
+            return False, True, False
+
+    else:
+        return False, False, False
 
 @app.callback(Output("confirm", "displayed"),
        [Input("hidden-div","figure")])
@@ -1473,13 +1858,14 @@ def update_output(contents, n_click, name):
     else:
         return None
 
-@app.callback(Output('processed-list', 'children'),
+@app.callback([Output('processed-list', 'children'),Output("extension-list",'children'),],
               [ Input('signal', 'children'),Input('hidden-div', 'figure'), Input('confirm', 'submit_n_clicks')])#
+
 def update_output(children1, children2, n_click):
     if  children2:
-        return [html.Li(file_download_link(filename)) for filename in children2]
+        return [html.Li(file_download_link(filename)) for filename in children2],get_file_name(EXTENSION_DIR)
 
-    return  get_file_name(ZIP_DIRECTORY)
+    return  get_file_name(ZIP_DIRECTORY),get_file_name(EXTENSION_DIR)
 
 
 
@@ -1697,10 +2083,12 @@ def update_graph(clickData, dimensional_reduction, cluster_method):
         'layout': layout_scatter
     }
 
-@app.callback([Output('3d_scatter_cluster', 'figure'),Output('3d_scatter_group', 'figure')],
-            [ Input("reduction_method","value"), Input("clustering-method","value"),]
-              )
-def displayClick( reduction_method, cluster_method):
+# @app.callback([Output('3d_scatter_cluster', 'figure'),Output('3d_scatter_group', 'figure'),Output('3d_scatter_cluster', 'style'),Output('3d_scatter_group', 'style')],
+#             [ Input('dropdown-3d', 'n_clicks'),Input('dropdown-2d', 'n_clicks'), Input("dimensional-reduction1","value"), Input("clustering-method","value"),]
+#               )
+def display3d( reduction_method, cluster_method):
+    #print("3d click:", selected_3d)
+
     if os.listdir(PROCESSED_DIRECTORY)==5:  # load and processed
 
             data = pd.read_pickle(PROCESSED_DIRECTORY + "processed_data.pkl")
@@ -1759,6 +2147,7 @@ def displayClick( reduction_method, cluster_method):
             x=data[data[cluster_label]==cls][x_axe],
             y=data[data[cluster_label]==cls][y_axe],
             z=[len(set(s)) for s in data[data[cluster_label]==cls]["arg"]],
+            #customdata=data[data[cluster_label]==cls]['id'],
             customdata=['<br>'+s for s in inputdata[inputdata[cluster_label]==cls]["arguments"]],
             hovertemplate='Id:%{text}</b><br>length:%{z} <br></b>Arguments:%{customdata} ',
             text=data[data[cluster_label]==cls].id,
@@ -1779,14 +2168,15 @@ def displayClick( reduction_method, cluster_method):
             text='Clusters Distribution',
             xref="paper",
             yref="paper",
-            x=0.5,
+            #x=0.5,
             font=dict(
                 size=20,
             )
         ),
+
             autosize=False,
-            width=850,
-            height=850,
+            width=700,
+            height=700,
             showlegend=True,
         )
     )
@@ -1815,14 +2205,14 @@ def displayClick( reduction_method, cluster_method):
                                 text='Groups Distribution',
                                 xref="paper",
                                 yref="paper",
-                                x=0.5,
+                                #x=0.5,
                                 font=dict(
                                     size=20,
                                 )
                         ),
                         autosize=False,
-                        width=850,
-                        height=850,
+                        width=700,
+                        height=700,
                         showlegend=True,
     ))
     # fig2.update_layout(
@@ -1831,7 +2221,7 @@ def displayClick( reduction_method, cluster_method):
     #     width=850,
     #     height=850,
     # )
-    return fig,fig2
+    return fig,fig2#,{'display':'block'},{'display':'block'}
 
 
 @app.callback(Output('correlation_hm', 'figure'),
@@ -1941,6 +2331,44 @@ def displayClick(btn1, btn2 , btn3, btn4):
     return fig
 
 
+
+@app.callback([ Output('feature_semantic_table', 'children'),
+               Output('feature_cluster_table', 'children')],
+              [Input('signal', 'children'),
+               Input("clustering-method", "value"),
+               Input('confirm', 'submit_n_clicks'),Input("semantic-method-1", "value"),])
+def get_feature_table(content,   cluster_method,
+                   n_click, table_method):
+    if len(os.listdir(PROCESSED_DIRECTORY)) == 12:
+        group_table = pd.read_pickle(PROCESSED_DIRECTORY + "group_feature.pkl")
+        cluster_table = pd.read_pickle(
+            PROCESSED_DIRECTORY + table_method + "_" + cluster_method + "_cluster_feature.pkl")
+    elif len(os.listdir(PROCESSED_DIRECTORY)) == 6 or n_click:  # load and processed
+
+        group_table = pd.read_pickle(PROCESSED_DIRECTORY + "group_feature.pkl")
+        cluster_table = pd.read_pickle(PROCESSED_DIRECTORY + cluster_method + "_cluster_feature.pkl")
+
+
+    else:
+        group_table = pd.read_pickle(DEFAULT_DATA + "group_feature.pkl")
+        if cluster_method == "km":
+            cluster_table = pd.read_pickle(DEFAULT_DATA + "km_cluster_feature.pkl")
+        else:
+            cluster_table = pd.read_pickle(DEFAULT_DATA + "db_cluster_feature.pkl")
+
+        # table
+    if len(group_table) == 0:
+        table1 = "No Semantics Feature"
+    else:
+        table1=dbc.Table.from_dataframe(group_table, striped=True, bordered=True, hover=True)
+
+
+    if len(cluster_table) == 0:
+        table2 = "No Cluster feature"
+    else:
+        table2=dbc.Table.from_dataframe(cluster_table, striped=True, bordered=True, hover=True)
+
+    return [table1, table2]
 
 
 if __name__ == '__main__':

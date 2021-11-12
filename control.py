@@ -146,14 +146,14 @@ WELL_COLORS = dict(
  )
 
 WELL_COLOR_new= [
-    "#8DD6F3",
-    "#2F8FD2",
-    "#A1D99B",
-    "#FA9FB5", #pink
-    "#FFEDA0",
-    "#67BD65",
-    "#BFD3E6",
-    "#B3DE69",
+    "#006401",
+    "#FFDB66",
+    "#FFA6FE",
+    "#01FFFE", #pink
+    "#FF0000",
+    "#0000FF",
+    "#00FF00",
+    "#000000",
     "#FDBF6F",
     "#FC9272",
     "#D0D1E6",

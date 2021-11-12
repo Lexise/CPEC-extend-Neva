@@ -13,13 +13,34 @@ from zipfile import ZipFile
 from pathlib import Path
 import time
 import itertools
+from rq import get_current_job
 import os
 from sklearn.model_selection import train_test_split
 #import subprocess
+import textwrap
 from clingo_asp_compute import compute_extensions
 
-def process_extension_individual(question, semantics, processed_dir, upload_dir, extenion_dir, eps, minpts,n_cluster): # for "other" situation, when user want to select their own semantics or semantic pairs
-    for item in semantics:
+import random
+
+
+def get_colors(n):
+    ret = []
+    r = int(random.random() * 256)
+    g = int(random.random() * 256)
+    b = int(random.random() * 256)
+    step = 256 / n
+    for i in range(n):
+        r += step
+        g += step
+        b += step
+        r = int(r) % 256
+        g = int(g) % 256
+        b = int(b) % 256
+        ret.append('rgb'+str((r, g, b)))
+    return ret
+
+def process_extension_individual(question, item, processed_dir, upload_dir, extenion_dir, eps, minpts,n_cluster): # for "other" situation, when user want to select their own semantics or semantic pairs
+
         if item == 'stable':
             asp_encoding = "stable_web.dl"
             end = "STB"
@@ -46,8 +67,37 @@ def process_extension_individual(question, semantics, processed_dir, upload_dir,
         # os.system(
         #     "D:/test2/clingo-4.5.4-win64/clingo.exe {} data/app_uploaded_files/{} 0 > data/extension_sets/{}".format(
         #         asp_encoding, question, extension_file))
-        process_data_two_sets(processed_dir, upload_dir + question, extenion_dir + extension_file, eps, minpts,
-                     n_cluster, item)
+        # process_data_two_sets(processed_dir, upload_dir + question, extenion_dir + extension_file, eps, minpts,
+        #              n_cluster, item)
+
+
+
+
+
+def find_semantic_files(files,item):
+    if item == 'stable':
+
+        end = "STB"
+    elif item == 'preferred' or item== 'preferred_stable':
+
+        end = "PR"
+    elif item == 'stage' or item=='stable_stage':
+        asp_encoding = "stage-cond-disj.dl"
+        end = "STG"
+    elif item == 'semi-stable':
+
+        end = "SEMI-STB"
+    elif item == 'cf2' or item == 'stable_cf2':
+
+        end = "CF2"
+    elif item == 'stage2' or item=='stage2_stable':
+
+        end = "STG2"
+    ends='.EE'+end
+    for x in files:
+        if x.endswith(ends):
+            return x
+    return None
 
 def addional_process_individual(processed_dir, semantics):
     if len(semantics)==1:
@@ -168,26 +218,32 @@ def process_data(dir, arguments_file, answer_sets, eps, minpts, n_cluster, seman
 
     #for_auto_reduction = pd.DataFrame(data=transfered, index=indexlist, columns=column_arg)  # test autoencoder
 
-
+    print("1.progress chldren{}, super{}".format(os.getpid(), os.getppid()))
 
     if "preferred_stable" in semantic:
         difference="not_defeated"
         big="preferred"
-        small="stable"
+        small="preferred and stable"
+        #middle='preferred and stable'
     elif "stable_stage" in semantic:
         difference="nrge"
         big="stage"
-        small="stable"
+        small="stage and stable"
+        #middle = 'stage and stable'
     elif "stage2_stable" in semantic:
         difference = "not_defeated"
         big = "stage2"
-        small = "stable"
+        small = "stage2 and stable"
+        #middle = 'stage2 and stable'
     elif "stable_cf2" in semantic:
         difference = "not_defeated"
         big = "cf2"
-        small = "stable"
-    elif 'cf2_stage2' in semantic:
-        pass#要不要用“groups”作为区分 only cf2, cf2 _tage2的标准
+        small = "cf2 and stable"
+        #middle = 'cf2 and stable'
+    else:
+        raise Exception
+    #elif 'cf2_stage2' in semantic:
+         #要不要用“groups”作为区分 only cf2, cf2 _tage2的标准
 
     not_defeated1 = []
     for s in test:
@@ -204,22 +260,28 @@ def process_data(dir, arguments_file, answer_sets, eps, minpts, n_cluster, seman
         difference: not_defeated1,
     })
     processed_data["groups"] = np.where(processed_data[difference] == 0, small, big)
-
+    print("2.progress chldren{}, super{}".format(os.getpid(), os.getppid()))
     print("generally process answer sets( read data, one hot, group label, ): ", time.process_time() - start)
     start2 = time.process_time()
-    if eps != "" and eps != "Eps":
-        processed_data = clustering_dbscan(processed_data, float(eps), int(minpts))
+    if eps != None:
+        if minpts != None:
+            processed_data = clustering_dbscan(processed_data, float(eps), int(minpts))
+        else:
+            processed_data = clustering_dbscan(processed_data, float(eps))
     else:
-        processed_data = clustering_dbscan(processed_data)
+        if minpts != None:
+            processed_data = clustering_dbscan(data=processed_data, minpoint= int(minpts))
+        else:
+            processed_data = clustering_dbscan(processed_data)
     print("dbscan clustering: ", time.process_time() - start2)
-
+    print("3.progress chldren{}, super{}".format(os.getpid(), os.getppid()))
     processed_data = dimensional_reduction(processed_data)
     y = np.array([np.array(xi) for xi in transfered])    #to change and test###############减少需要内存大小
     processed_data =dimensional_reduction_autoencoding(y, processed_data)
     #processed_data =dimensional_reduction_autoencoding(for_auto_reduction, processed_data)
     start3 = time.process_time()
 
-    if n_cluster !="" and n_cluster !="Cluster Num":
+    if n_cluster !=None and n_cluster !="2":
         processed_data= clustering_km(processed_data,int(n_cluster))
     else:
         processed_data= clustering_km(processed_data)
@@ -252,7 +314,7 @@ def process_data(dir, arguments_file, answer_sets, eps, minpts, n_cluster, seman
     temp = all_occurence.astype(int)
     correlation_matrix = temp.corr()
     print("create correlation matrix: ", time.process_time() - start5)
-
+    print("4.progress chldren{}, super{}".format(os.getpid(), os.getppid()))
     #find features:
     start6 = time.process_time()
     common_all = set(arguments[0]).intersection(*arguments)
@@ -274,7 +336,8 @@ def process_data(dir, arguments_file, answer_sets, eps, minpts, n_cluster, seman
     # create a ZipFile object
     start7 = time.process_time()
     file_name=arguments_file.split("/")[-1]
-    zipname = big+"_"+file_name.strip("apx") + "zip"
+    parameter='-Eps('+str(eps)+')-MinP('+str(minpts)+')-Cluster_num('+str(n_cluster)+')'
+    zipname = big+"_"+file_name.strip(".apx") +parameter+ ".zip"
     path = Path(dir)
     zip_dir= str(path.parent) +"/processed_zip/"
     with ZipFile(zip_dir + zipname, 'w') as zipObj:
@@ -293,12 +356,12 @@ def process_data(dir, arguments_file, answer_sets, eps, minpts, n_cluster, seman
 
 def clustering_km( data, cluster_num=2):
     km = KMeans(n_clusters=cluster_num, precompute_distances='auto').fit_predict(list(data['in']))
-    data['km_cluster_label'] = km
+    data['km_cluster_label'] = [i+1 for i in km]
     return data
 
 def clustering_dbscan( data, eps=1.7, minpoint=7):
     c = DBSCAN(eps=eps, min_samples=minpoint).fit_predict(list(data['in']))
-    data['db_cluster_label'] = c
+    data['db_cluster_label'] = [i+1 for i in c]
     return  data
 
 def dimensional_reduction_autoencoding(data, processed_data)->pd.DataFrame:

@@ -27,10 +27,15 @@ def compute_extensions(apx_file, asp_file, extension_file):
         n=1
         for m in handle:
             file1.writelines(("Answer: {}\n{}\n".format(n,m)))
-            if round(os.path.getsize(extension_file)/(1024*1024),3) > 10: #Megabytes
+            if round(os.path.getsize(extension_file)/(1024*1024),3) > 20: #Megabytes
                 print("size:",os.path.getsize(extension_file))
                 ctl.interrupt()
+                file1.close()
+                #test.append('oversize')
+                return "oversize"
             n+=1
             handle.get()
 
     file1.close()
+
+    return True
