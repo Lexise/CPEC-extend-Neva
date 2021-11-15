@@ -1186,10 +1186,13 @@ def compute_value( n_clicks, semantics,  eps, minpts, n_cluster,semantics2):
 
 
 @app.callback([Output('store-prev-comparisons', 'data')],
-                     [Input('check_semantics2', 'value'),Input('submit-button-state', 'n_clicks')],
+                     [Input('check_semantics', 'value'),Input('check_semantics2', 'value'),Input('submit-button-state', 'n_clicks')],
                      [State('store-prev-comparisons', 'data')])
-def select_comparison(comparisons, submit_click, prev_comparisons):
+def select_comparison(semantic1,comparisons, submit_click, prev_comparisons):
   print('clicks3:',submit_click)
+
+  if semantic1!='others':
+      raise dash.exceptions.PreventUpdate
   if comparisons is None:  # on page load
     raise dash.exceptions.PreventUpdate
   if submit_click==0:
@@ -1810,7 +1813,7 @@ def set_bar_figure(argument_data, valuelist):
 @app.callback([Output("stop_confirm", "displayed"),Output("progress-extension", "animated"),Output("progress-process", "animated")] ,  #should be style
        [Input('submit-button-state', 'n_clicks'), Input("signal","children")],
               )
-def show_confirm(n_clicks,value,semantics,state):
+def show_confirm(n_clicks,value):
     print('clicks2',n_clicks)
     if n_clicks>0:
         if value=='oversize':
