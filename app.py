@@ -416,9 +416,9 @@ main_page =     html.Div([
         dcc.Dropdown(
             id='visual-dropdown',
             options=[
+                {'label': 'new processing', 'value': 'upload-user'},
                 {'label': 'two dimension', 'value': 'dropdown-2d'},
                 {'label': 'three dimension', 'value': 'dropdown-3d'},
-                {'label': 'new processing', 'value': 'upload-user'},
 
             ],
             placeholder="Visualization",
@@ -881,7 +881,7 @@ main_page =     html.Div([
 
         ],
         id="upload_block",
-        style={'display':'none'},
+        #style={'display':'none'},
         className="my_container"
         ),
 
@@ -1070,7 +1070,7 @@ def global_store(eps, minpts, n_cluster, semantics):
             # process_data_two_sets(PROCESSED_DIRECTORY, UPLOAD_DIRECTORY + question, ZIP_DIRECTORY + extension_file2, eps,
             #              minpts, n_cluster, "cf2")
             # addional_process_individual(PROCESSED_DIRECTORY, semantics)
-            global_individual(eps, minpts, n_cluster, ["cf2","stage2"])
+            return global_individual(eps, minpts, n_cluster, ["cf2","stage2"])
             # processed_data_stage2= pd.read_pickle(PROCESSED_DIRECTORY + "stage2_processed_data.pkl")
             # processed_data_cf2= pd.read_pickle(PROCESSED_DIRECTORY + "cf2_processed_data.pkl")
             # # X_train,  y_test = train_test_split(processed_data2, test_size=0.33)
@@ -1095,7 +1095,7 @@ def global_store(eps, minpts, n_cluster, semantics):
             # color_label = "category"
             # processed_data = pd.concat([present_data1, present_data2, present_common])
             # processed_data.to_pickle(PROCESSED_DIRECTORY + "combined_processed_data.pkl")
-            return True
+
 
         elif "preferred_stable" in semantics:
             asp_encoding="prefex.dl"
@@ -1140,10 +1140,10 @@ def global_store(eps, minpts, n_cluster, semantics):
 
         print("(whole)get processed data", time.process_time() - start_time) #time.time() - start_time)
         if compute_extension_result == 'finished':
-            return 'finished'
+            return True
     else:
         print("the form of input file is not correct.")
-
+        return False
 
 # @app.callback(
 #     Output("popover", "is_open"),
@@ -1185,24 +1185,46 @@ def compute_value( n_clicks, semantics,  eps, minpts, n_cluster,semantics2):
     # return value
 
 
+# @app.callback([Output('store-prev-comparisons', 'data')],
+#                      [Input('check_semantics', 'value'),Input('check_semantics2', 'value'),Input('submit-button-state', 'n_clicks')],
+#                      [State('store-prev-comparisons', 'data')])
+# def select_comparison(semantic1,comparisons, submit_click, prev_comparisons):
+#   print('clicks3:',submit_click)
+#
+#   if semantic1== None:
+#       raise dash.exceptions.PreventUpdate
+#   if semantic1!='others' or comparisons is None:  # on page load
+#       return dash.no_update
+#   if submit_click==0:
+#       return dash.no_update
+#   if len(comparisons) == 3 or len(comparisons) == 2:
+#     # changes store-prev-comparisons which triggers above callback
+#     return comparisons[0:2],
+#   elif comparisons == prev_comparisons:
+#      # this only happens if we just trimmed so don't do anything to break circularity
+#      raise dash.exception.PreventUpdate
+#
+#   elif len(comparisons) ==1:
+#       print("comparison:",comparisons)
+#       return comparisons
+#
+#   else:
+#     # when <= 3 don't modify store-prev-comparisons and therefore don't trigger above
+#     raise dash.exceptions.PreventUpdate#dash.no_update
+
 @app.callback([Output('store-prev-comparisons', 'data')],
-                     [Input('check_semantics', 'value'),Input('check_semantics2', 'value'),Input('submit-button-state', 'n_clicks')],
-                     [State('store-prev-comparisons', 'data')])
-def select_comparison(semantic1,comparisons, submit_click, prev_comparisons):
+                     [Input('check_semantics', 'value'),Input('check_semantics2', 'value'),Input('submit-button-state', 'n_clicks')])
+def select_comparison(semantic1,comparisons, submit_click):
   print('clicks3:',submit_click)
 
-  if semantic1!='others':
+  if semantic1== None or submit_click==0:
       raise dash.exceptions.PreventUpdate
-  if comparisons is None:  # on page load
-    raise dash.exceptions.PreventUpdate
-  if submit_click==0:
+  if semantic1!='others' or comparisons is None:  # on page load
       return dash.no_update
-  if len(comparisons) == 3 or len(comparisons) == 2:
+
+  if len(comparisons) >2 or len(comparisons) == 2:
     # changes store-prev-comparisons which triggers above callback
     return comparisons[0:2],
-  elif comparisons == prev_comparisons:
-     # this only happens if we just trimmed so don't do anything to break circularity
-     raise dash.exception.PreventUpdate
 
   elif len(comparisons) ==1:
       print("comparison:",comparisons)
@@ -1210,9 +1232,7 @@ def select_comparison(semantic1,comparisons, submit_click, prev_comparisons):
 
   else:
     # when <= 3 don't modify store-prev-comparisons and therefore don't trigger above
-    return dash.no_update
-
-
+    raise dash.exceptions.PreventUpdate#dash.no_update
 
 
 
@@ -1811,14 +1831,15 @@ def set_bar_figure(argument_data, valuelist):
 #     return [True]
 
 @app.callback([Output("stop_confirm", "displayed"),Output("progress-extension", "animated"),Output("progress-process", "animated")] ,  #should be style
-       [Input('submit-button-state', 'n_clicks'), Input("signal","children")],
+       [Input('submit-button-state', 'n_clicks'), ], #Input("signal","children"),
+        [State('signal', 'children')]
               )
 def show_confirm(n_clicks,value):
     print('clicks2',n_clicks)
     if n_clicks>0:
         if value=='oversize':
             return True, False, False
-        elif value=='finished':
+        elif value=='True':
             return False, False, True
         else:
             return False, True, False
