@@ -13,6 +13,7 @@ from zipfile import ZipFile
 from pathlib import Path
 import time
 import itertools
+from BayesianOptimization import bayesian_optimization
 from rq import get_current_job
 import os
 from sklearn.model_selection import train_test_split
@@ -39,7 +40,7 @@ def get_colors(n):
         ret.append('rgb'+str((r, g, b)))
     return ret
 
-def process_extension_individual(question, item, processed_dir, upload_dir, extenion_dir, eps, minpts,n_cluster): # for "other" situation, when user want to select their own semantics or semantic pairs
+def process_extension_individual(question, item, processed_dir, upload_dir, extenion_dir): # for "other" situation, when user want to select their own semantics or semantic pairs
 
         if item == 'stable':
             asp_encoding = "stable_web.dl"
@@ -57,13 +58,14 @@ def process_extension_individual(question, item, processed_dir, upload_dir, exte
         elif item == 'cf2':
             asp_encoding = "cf2_web.dl"
             end = "CF2"
-        elif item == 'stage2':
-            asp_encoding = "stage2_web.txt"
-            end = "STG2"
+        # elif item == 'stage2':
+        #     asp_encoding = "stage2_web.txt"
+        #     end = "STG2"
         else:
             return False
         extension_file = "{}.EE_{}".format(question, end)
         compute_extensions(upload_dir +question,asp_encoding,extenion_dir+extension_file)
+        return extension_file
         # os.system(
         #     "D:/test2/clingo-4.5.4-win64/clingo.exe {} data/app_uploaded_files/{} 0 > data/extension_sets/{}".format(
         #         asp_encoding, question, extension_file))
@@ -74,7 +76,7 @@ def process_extension_individual(question, item, processed_dir, upload_dir, exte
 
 
 
-def find_semantic_files(files,item):
+def find_semantic_files(files,item):#找对应的extension文件
     if item == 'stable':
 
         end = "STB"
@@ -90,10 +92,10 @@ def find_semantic_files(files,item):
     elif item == 'cf2' or item == 'stable_cf2':
 
         end = "CF2"
-    elif item == 'stage2' or item=='stage2_stable':
-
-        end = "STG2"
-    ends='.EE'+end
+    # elif item == 'stage2' or item=='stage2_stable':
+    #
+    #     end = "STG2"
+    ends='.EE_'+end
     for x in files:
         if x.endswith(ends):
             return x
@@ -129,6 +131,29 @@ def addional_process_individual(processed_dir, semantics):
     processed_data = pd.concat([present_data1, present_data2, present_common])
     processed_data.to_pickle(processed_dir + "CombinedProcessed_data.pkl")
 
+
+
+def get_catogery(processed_dir, semantics):
+    if len(semantics)==1:
+        return False
+    semantic1=semantics[0]
+    semantic2=semantics[1]
+    processed_data_stage2 = pd.read_pickle(processed_dir + semantic1 + "_processed_data.pkl")
+    processed_data_cf2 = pd.read_pickle(processed_dir + semantic2 + "_processed_data.pkl")
+    common_data = pd.merge(processed_data_cf2, processed_data_stage2, on=['arg'], how='inner')
+    #present_data1 = processed_data_cf2[~processed_data_cf2.id.isin(common_data.id_x)]
+    processed_data_stage2["category"] = "only_"+semantic1
+    processed_data_stage2[processed_data_stage2.id.isin(common_data.id_x)]["category"]="only_"+semantic1
+    #present_data2 = processed_data_stage2[~processed_data_stage2.id.isin(common_data.id_y)]
+    processed_data_cf2["category"] = "only_"+semantic2
+    processed_data_cf2[processed_data_cf2.id.isin(common_data.id_x)]["category"] = "only_" + semantic2
+    processed_data_stage2.to_pickle(processed_dir + semantic1 + "_processed_data.pkl")
+    processed_data_cf2.to_pickle(processed_dir + semantic2 + "_processed_data.pkl")
+
+
+
+
+
 def clean_folder(folder_path):
     if len(listdir(folder_path))!=0:
         removed=[]
@@ -147,22 +172,27 @@ def clean_folder(folder_path):
 
 def get_color_label(processed_data, color_label,groups_set):
     processed_data['color'] = processed_data[color_label]
-    if color_label =='category':
-
-        colors=['#e5f5f9','#2ca25f']
-        if len(groups_set)<3:
-            processed_data["color"]='#2ca25f'
-        else:
-            for x in groups_set:
-                if 'and' in x:
-                    processed_data["color"].replace({x: '#99d8c9'}, inplace=True)
-                else:
-                    processed_data["color"].replace({x: colors[0]}, inplace=True)
-                    del colors[0]
+    # if color_label =='category':  #seperate semantic extensions
+        # d8b365
+        # f5f5f5
+        # 5ab4ac
+    colors=['#FFF8E3','#c7eae5'] #f6e8c3
+    if len(groups_set)<2:
+        processed_data["color"]='#c7eae5'
     else:
-        colors=['#e41a1c','#377eb8','#4daf4a']
-        for x in range(0,len(groups_set)):
-            processed_data["color"].replace({groups_set[x]: colors[x]}, inplace=True)
+        for x in groups_set:
+            if 'and' in x:
+                processed_data["color"].replace({x: '#F0F0F0'}, inplace=True) # f5f5f5
+            else:
+                processed_data["color"].replace({x: colors[0]}, inplace=True)
+                del colors[0]
+    # else:
+    #     # ef8a62
+    #     # ffffff
+    #     # 999999
+    #     colors=['#f6e8c3','#f5f5f5','#c7eae5'] #['#e41a1c','#377eb8','#4daf4a']
+    #     for x in range(0,len(groups_set)):
+    #         processed_data["color"].replace({groups_set[x]: colors[x]}, inplace=True)
 
 # def change_to_hotpot(answer, item):
 #
@@ -178,7 +208,7 @@ def f_comma(my_str, group, char=','):
         return char.join(my_str[i:i+group] for i in range(0, len(my_str), group))
 
 
-def process_data(dir, arguments_file, answer_sets, eps, minpts, n_cluster, semantic):
+def process_data(dir, arguments_file, answer_sets, eps, minpts, n_cluster, use_optim,semantic):
 
     #os.system(
     #    "D:/test2/clingo-4.5.4-win64/clingo.exe prefex.dl apx_files/AachenerVerkehrsverbund_26October2020.zip_train+metro+tram+bus.lp.apx 0 > extension_sets/test.EE_PR")
@@ -230,10 +260,10 @@ def process_data(dir, arguments_file, answer_sets, eps, minpts, n_cluster, seman
         big="stage"
         small="stage and stable"
         #middle = 'stage and stable'
-    elif "stage2_stable" in semantic:
-        difference = "not_defeated"
-        big = "stage2"
-        small = "stage2 and stable"
+    # elif "stage2_stable" in semantic:
+    #     difference = "not_defeated"
+    #     big = "stage2"
+    #     small = "stage2 and stable"
         #middle = 'stage2 and stable'
     elif "stable_cf2" in semantic:
         difference = "not_defeated"
@@ -243,7 +273,7 @@ def process_data(dir, arguments_file, answer_sets, eps, minpts, n_cluster, seman
     else:
         raise Exception
     #elif 'cf2_stage2' in semantic:
-         #要不要用“groups”作为区分 only cf2, cf2 _tage2的标准
+         #要不要用“groups”作为区分 only cf2, cf2 _stage2的标准
 
     not_defeated1 = []
     for s in test:
@@ -263,28 +293,46 @@ def process_data(dir, arguments_file, answer_sets, eps, minpts, n_cluster, seman
     print("2.progress chldren{}, super{}".format(os.getpid(), os.getppid()))
     print("generally process answer sets( read data, one hot, group label, ): ", time.process_time() - start)
     start2 = time.process_time()
-    if eps != None:
-        if minpts != None:
-            processed_data = clustering_dbscan(processed_data, float(eps), int(minpts))
-        else:
-            processed_data = clustering_dbscan(processed_data, float(eps))
+    if use_optim:
+        eps, minpts = bayesian_optimization(processed_data, 'dbscan')
+
+        processed_data = clustering_dbscan(processed_data, eps, minpts)
     else:
-        if minpts != None:
-            processed_data = clustering_dbscan(data=processed_data, minpoint= int(minpts))
+        if eps ==None or minpts == None:
+            return 'parameter mistakes'
         else:
-            processed_data = clustering_dbscan(processed_data)
+            processed_data = clustering_dbscan(processed_data, float(eps), int(minpts))
+    # if eps != None:
+    #     if minpts != None:
+    #         processed_data = clustering_dbscan(processed_data, float(eps), int(minpts))
+    #     else:
+    #         processed_data = clustering_dbscan(processed_data, float(eps))
+    # else:
+    #     if minpts != None:
+    #         processed_data = clustering_dbscan(data=processed_data, minpoint= int(minpts))
+    #     else:
+    #         processed_data = clustering_dbscan(processed_data)
     print("dbscan clustering: ", time.process_time() - start2)
-    print("3.progress chldren{}, super{}".format(os.getpid(), os.getppid()))
+
     processed_data = dimensional_reduction(processed_data)
     y = np.array([np.array(xi) for xi in transfered])    #to change and test###############减少需要内存大小
     processed_data =dimensional_reduction_autoencoding(y, processed_data)
     #processed_data =dimensional_reduction_autoencoding(for_auto_reduction, processed_data)
     start3 = time.process_time()
+    if use_optim:
 
-    if n_cluster !=None and n_cluster !="2":
-        processed_data= clustering_km(processed_data,int(n_cluster))
+        n_cluster = bayesian_optimization(processed_data, 'kmeans')
+        processed_data = clustering_km(processed_data, n_cluster)
     else:
-        processed_data= clustering_km(processed_data)
+        if n_cluster ==None:
+            return 'parameter_mistakes'
+        else:
+            processed_data= clustering_km(processed_data,int(n_cluster))
+
+            # if n_cluster !=None and n_cluster !="2":
+            #     processed_data= clustering_km(processed_data,int(n_cluster))
+            # else:
+            #     processed_data= clustering_km(processed_data)
     print("kmeans clustering: ", time.process_time() - start3)
 
     start4 = time.process_time()
@@ -336,6 +384,7 @@ def process_data(dir, arguments_file, answer_sets, eps, minpts, n_cluster, seman
     # create a ZipFile object
     start7 = time.process_time()
     file_name=arguments_file.split("/")[-1]
+
     parameter='-Eps('+str(eps)+')-MinP('+str(minpts)+')-Cluster_num('+str(n_cluster)+')'
     zipname = big+"_"+file_name.strip(".apx") +parameter+ ".zip"
     path = Path(dir)
@@ -540,67 +589,118 @@ def find_feature_group(common_all, data, otherdata):  #clustered data
 
 
 
-
-
-
-
-
-
-def process_data_two_sets(dir, arguments_file, answer_sets, eps, minpts, n_cluster, semantic): #process need to handlle two semantics seperately
-
-    #os.system(
-    #    "D:/test2/clingo-4.5.4-win64/clingo.exe prefex.dl apx_files/AachenerVerkehrsverbund_26October2020.zip_train+metro+tram+bus.lp.apx 0 > extension_sets/test.EE_PR")
+def initial_process_individual(dir, arguments_file, answer_sets,semantic):
     start = time.process_time()
 
     with open(arguments_file, 'r') as file:
         question = file.read()
     itemlist = [s for s in re.findall(r"arg[(]a(.*?)[)].", question)]
     itemlist.sort()
-    #column_arg = [str(s) for s in itemlist]    #test autoencoder
+    # column_arg = [str(s) for s in itemlist]    #test autoencoder
     with open(answer_sets, 'r') as file:
         answer = file.read()
 
     test = answer.split("Answer:")
     del test[0]
-    #indexlist = [int(s.split("\n",1)[0]) for s in test]
-    arg_len=len(test)
+    # indexlist = [int(s.split("\n",1)[0]) for s in test]
+    arg_len = len(test)
     if arg_len == 0:
         return False
-    indexlist = range(1,arg_len+1)
-    transfered=[]
-    arguments=[]
-
+    indexlist = range(1, arg_len + 1)
+    transfered = []
+    arguments = []
 
     for s in test:
-      temp1=re.findall(r"^in(.*)", s, re.M)
-      if temp1:
-        temp2=[s for s in re.findall(r'\d+', temp1[0])]
-        bool_represent = np.in1d(itemlist, temp2) #boolean list representation
-        temp2=frozenset(temp2)
-        one_answer=bool_represent.astype(int) #to int list
-        transfered.append( one_answer)
-        arguments.append(temp2)
-      else:
-        arguments.append(set())
-        transfered.append([])
+        temp1 = re.findall(r"^in(.*)", s, re.M)
+        if temp1:
+            temp2 = [s for s in re.findall(r'\d+', temp1[0])]
+            bool_represent = np.in1d(itemlist, temp2)  # boolean list representation
+            temp2 = frozenset(temp2)
+            one_answer = bool_represent.astype(int)  # to int list
+            transfered.append(one_answer)
+            arguments.append(temp2)
+        else:
+            arguments.append(set())
+            transfered.append([])
 
-    #for_auto_reduction = pd.DataFrame(data=transfered, index=indexlist, columns=column_arg)  # test autoencoder
-
-
-
+    # for_auto_reduction = pd.DataFrame(data=transfered, index=indexlist, columns=column_arg)  # test autoencoder
 
     processed_data = pd.DataFrame({
         'id': indexlist,
         'in': transfered,
         'arg': arguments,
     })
-
+    processed_data.to_pickle(dir+semantic+'_processed_data.pkl')
     print("generally process answer sets( read data, one hot, group label, ): ", time.process_time() - start)
+    return transfered,arguments, itemlist
+
+
+def process_data_two_sets(dir, arguments_file, transfered, arguments, itemlist, eps, minpts, n_cluster, use_optim, semantic): #process need to handlle two semantics seperately
+    #transfered, arguments, itemlist=initial_process_individual(dir, arguments_file, answer_sets,semantic)
+
+    # start = time.process_time()
+    #
+    # with open(arguments_file, 'r') as file:
+    #     question = file.read()
+    # itemlist = [s for s in re.findall(r"arg[(]a(.*?)[)].", question)]
+    # itemlist.sort()
+    # #column_arg = [str(s) for s in itemlist]    #test autoencoder
+    # with open(answer_sets, 'r') as file:
+    #     answer = file.read()
+    #
+    # test = answer.split("Answer:")
+    # del test[0]
+    # #indexlist = [int(s.split("\n",1)[0]) for s in test]
+    # arg_len=len(test)
+    # if arg_len == 0:
+    #     return False
+    # indexlist = range(1,arg_len+1)
+    # transfered=[]
+    # arguments=[]
+    #
+    #
+    # for s in test:
+    #   temp1=re.findall(r"^in(.*)", s, re.M)
+    #   if temp1:
+    #     temp2=[s for s in re.findall(r'\d+', temp1[0])]
+    #     bool_represent = np.in1d(itemlist, temp2) #boolean list representation
+    #     temp2=frozenset(temp2)
+    #     one_answer=bool_represent.astype(int) #to int list
+    #     transfered.append( one_answer)
+    #     arguments.append(temp2)
+    #   else:
+    #     arguments.append(set())
+    #     transfered.append([])
+    #
+    # #for_auto_reduction = pd.DataFrame(data=transfered, index=indexlist, columns=column_arg)  # test autoencoder
+    #
+    #
+    #
+    #
+    # processed_data = pd.DataFrame({
+    #     'id': indexlist,
+    #     'in': transfered,
+    #     'arg': arguments,
+    # })
+    #
+    # print("generally process answer sets( read data, one hot, group label, ): ", time.process_time() - start)
     start2 = time.process_time()
-    if eps != "" and eps != "Eps":
-        processed_data = clustering_dbscan(processed_data, float(eps), int(minpts))
+    processed_data=pd.read_pickle(dir+semantic+'_processed_data.pkl')
+
+    if use_optim:
+
+        eps,minpts = bayesian_optimization(processed_data, 'dbscan')
+        processed_data = clustering_dbscan(processed_data, eps, minpts)
     else:
-        processed_data = clustering_dbscan(processed_data)
+        if n_cluster == None:
+            return 'parameter_mistakes'
+        else:
+            processed_data = clustering_dbscan(processed_data, float(eps), int(minpts))
+
+    # if eps != "" and eps != "Eps":
+    #     processed_data = clustering_dbscan(processed_data, float(eps), int(minpts))
+    # else:
+    #     processed_data = clustering_dbscan(processed_data)
     print("dbscan clustering: ", time.process_time() - start2)
 
     processed_data = dimensional_reduction(processed_data)
@@ -609,12 +709,24 @@ def process_data_two_sets(dir, arguments_file, answer_sets, eps, minpts, n_clust
     #processed_data =dimensional_reduction_autoencoding(for_auto_reduction, processed_data)
     start3 = time.process_time()
 
-    if n_cluster !="" and n_cluster !="Cluster Num":
-        processed_data= clustering_km(processed_data,int(n_cluster))
-    else:
-        processed_data= clustering_km(processed_data)
-    print("kmeans clustering: ", time.process_time() - start3)
 
+
+    # if n_cluster !="" and n_cluster !="Cluster Num":
+    #     processed_data= clustering_km(processed_data,int(n_cluster))
+    # else:
+    #     processed_data= clustering_km(processed_data)
+    #
+
+    if use_optim:
+
+        n_cluster = bayesian_optimization(processed_data, 'kmeans')
+        processed_data = clustering_km(processed_data, n_cluster)
+    else:
+        if n_cluster ==None:
+            return 'parameter_mistakes'
+        else:
+            processed_data= clustering_km(processed_data,int(n_cluster))
+    print("kmeans clustering: ", time.process_time() - start3)
     start4 = time.process_time()
     all_arguments = [item for sublist in arguments for item in sublist]
     frequency = np.array([])
@@ -664,7 +776,9 @@ def process_data_two_sets(dir, arguments_file, answer_sets, eps, minpts, n_clust
     # create a ZipFile object
     start7 = time.process_time()
     file_name=arguments_file.split("/")[-1]
-    zipname = semantic+"_"+file_name.strip("apx") + "zip"
+    parameter = '-Eps(' + str(eps) + ')-MinP(' + str(minpts) + ')-Cluster_num(' + str(n_cluster) + ')'
+    zipname = semantic + "_" + file_name.strip(".apx") + parameter + ".zip"
+    #zipname = semantic+"_"+file_name.strip("apx") + "zip"
     path = Path(dir)
     zip_dir= str(path.parent) +"/processed_zip/"
     with ZipFile(zip_dir + zipname, 'w') as zipObj:

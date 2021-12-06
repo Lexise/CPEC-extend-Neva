@@ -23,7 +23,8 @@ from flask_caching import Cache
 from flask import Flask, send_from_directory,request
 from clustering_correlation import compute_serial_matrix,innovative_correlation_clustering,my_optimal_leaf_ordering,abs_optimal_leaf_ordering
 import numpy as np
-from process_data import  process_data,clean_folder,get_color_label, find_feature_group, process_data_two_sets, addional_process_individual, process_extension_individual,get_colors,find_semantic_files
+from process_data import  process_data,clean_folder,get_color_label, find_feature_group, process_data_two_sets,\
+    addional_process_individual, process_extension_individual,get_colors,find_semantic_files,get_catogery,initial_process_individual
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 import copy
 from dash.dependencies import Input, Output, State, ClientsideFunction
@@ -401,14 +402,6 @@ correlation_page= html.Div([
 
 main_page =     html.Div([
 
-    # dbc.DropdownMenu(
-    #     label="Visualization",
-    #     children=[
-    #         dbc.DropdownMenuItem("two dimension",id='dropdown-2d',),
-    #         dbc.DropdownMenuItem("three dimension",id='dropdown-3d',),
-    #         dbc.DropdownMenuItem("Item 3"),
-    #     ],
-    # ),
 
         # empty Div to trigger javascript file for graph resizing
     html.Div(id="output-clientside"),
@@ -421,79 +414,23 @@ main_page =     html.Div([
                 {'label': 'three dimension', 'value': 'dropdown-3d'},
 
             ],
-            placeholder="Visualization",
-            style={'font-size': '14px', 'width': '20%','marginRight': '2%','marginTop': '2%'}
+            value='upload-user',
+            style={'font-size': '14px', 'width': '150px','marginLeft': '2%'}
         ),
 
         #html.Br(),
         dcc.Link(html.Button('Argument Analysis',
-                             style={'marginLeft': '2%','width': '30%', 'font-size': '14px', "color": "#FFFF", "backgroundColor": "#2F8FD2"}),
+                             style={'marginLeft': '4%','marginRight': '8px','width': '300px', 'font-size': '14px', "color": "#FFFF", "backgroundColor": "#2F8FD2"}),
                  href='/page-argument'),
+
         # dcc.Link(html.Button('3D Analysis',style={'marginLeft': '2%','width': '32%','font-size':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-3d'),
         dcc.Link(html.Button('Correlation Matrix',
-                             style={'marginLeft': '2%', 'width': '30%', 'font-size': '14px', "color": "#FFFF",
+                             style={'marginLeft': '4%', 'width': '300px', 'font-size': '14px', "color": "#FFFF",
                                     "backgroundColor": "#2F8FD2"}), href='/page-correlation'),
     #html.Hr(),
-    ]
+    ],
+    className="row flex-display",
     ),
-    # html.Div(
-    #     [
-    #             # html.Div(
-    #             #     [
-    #             #         html.A(
-    #             #             html.Button("Get Default Data", id="get_default_data",
-    #             #                         style={"color":"#FFFF","backgroundColor":"#2F8FD2"}),
-    #             #             href="https://github.com/Lexise/ASP-Analysis/tree/master/data/default_raw_data",
-    #             #         )
-    #             #     ],
-    #             #     #className="one-fifth column",
-    #             #     style={'width': '15%', 'textAlign': 'left'},
-    #             #     id="download_default",
-    #             # ),
-    #             # html.Div(
-    #             #     [
-    #             #         html.H2(
-    #             #             "NEVA",
-    #             #             style={"margin-bottom": "10px",'fontWeight': 'bold'},
-    #             #         ),
-    #             #         html.H5(
-    #             #             "Extension Visualization for Argumentation Frameworks", style={"margin-top": "0px"}
-    #             #         ),
-    #             #
-    #             #
-    #             #
-    #             #     ],
-    #             #
-    #             #     #className="one-half column",
-    #             #     id="title",
-    #             #     style={'width': '100%', 'textAlign': 'center'}
-    #             # ),
-    #             # html.Div(
-    #             #     [
-    #             #
-    #             #         dcc.Upload([html.Button("View/ Upload Processed Data" ,id="view_button",className="dcc_control")],id="view-processed-button",multiple=True),
-    #             #
-    #             #         dcc.ConfirmDialog(
-    #             #             id='confirm',
-    #             #             message='Do you want to visualize uploaded data?',
-    #             #         ),
-    #             #         html.Div(id='hidden-div', style={'display':'none'})
-    #             #         #html.A('Refresh', href='/')
-    #             #     ],
-    #             #     #className="one-fifth column",
-    #             #     style={'width': '15%', 'textAlign': 'right'},
-    #             #     id="button",
-    #             # ),
-    #
-    #
-    #
-    #     ],
-    #     id="header",
-    #     className="row flex-display",
-    #     style={"margin-bottom": "25px"},
-    #     ),
-
-
 
 
 
@@ -545,7 +482,7 @@ main_page =     html.Div([
                     value=processed_semantics[0],
                 )],
                 id="semantic-method",
-                style={'marginLeft': '2%', 'width': '28%'},
+                style={'marginLeft': '2%', 'width': '18%'},
             ),
             html.Div(children=[
                 html.Span("Dimensional Reduction:", style={"font-weight": "bold"}),
@@ -560,7 +497,7 @@ main_page =     html.Div([
                     value="tsne",
                 ),
             ],
-                style={'marginLeft': '2%', 'width': '28%'},
+                style={'marginLeft': '2%', 'width': '18%'},
 
             ),
 
@@ -577,11 +514,11 @@ main_page =     html.Div([
                     value="db",
                 )],
 
-                style={'marginLeft': '2%', 'width': '28%'},
+                style={'marginLeft': '2%', 'width': '18%'},
             ),
 
             html.Button(id='feature_semantic', children='semantics feature',className='middle-button',
-                        style={'marginTop':'1%','font-size': '14px', "color": "#000000", "backgroundColor": "#f0f0f0"}),
+                        style={'marginTop':'0.5%','font-size': '14px', "color": "#000000", "backgroundColor": "#f0f0f0"}),
             dbc.Tooltip(
 
                 id='feature_semantic_table',
@@ -589,13 +526,16 @@ main_page =     html.Div([
                 style ={'font-size': '11px',"color": "#000000", "backgroundColor": "#f0f0f0"}
             ),
             html.Button(id='feature_cluster', children='clusters feature',className='middle-button',
-                        style={'marginTop':'1%','font-size': '14px','marginLeft': '3%', "color": "#000000", "backgroundColor": "#f0f0f0"}),
+                        style={'marginTop':'0.5%','font-size': '14px','marginLeft': '3%', "color": "#000000", "backgroundColor": "#f0f0f0"}),#'marginTop':'1%',
 
             dbc.Tooltip(
                 id='feature_cluster_table',
                 target="feature_cluster",
                 style={'font-size': '11px', "color": "#000000", "backgroundColor": "#f0f0f0"}
             ),
+
+
+
         ],
             id='options-visualization',
             style={'display':'none'},
@@ -655,9 +595,9 @@ main_page =     html.Div([
                     options=[
                         {'label': 'Preferred and Stable', 'value': 'preferred_stable'},
                         {'label': 'Stable and Stage', 'value': 'stable_stage'},
-                        {'label': 'Stable and Stage2', 'value': 'stage2_stable'},
+                        #{'label': 'Stable and Stage2', 'value': 'stage2_stable'},
                         {'label': 'Stable and CF2', 'value': 'stable_cf2'},
-                        {'label': 'Stage2 and CF2', 'value': 'cf2_stage2'},
+                        #{'label': 'Stage2 and CF2', 'value': 'cf2_stage2'},
                         {'label':"Semi-Stable and Preferred", 'value':'semi-stable_preferred'},
                         {'label':"Others", 'value':'others'}
                     ],
@@ -693,7 +633,7 @@ main_page =     html.Div([
                             {'label': 'Preferred ', 'value': 'preferred'},
                             {'label': 'Stable', 'value': 'stable'},
                             {'label': 'Stage', 'value': 'stage'},
-                            {'label': 'Stage2', 'value': 'stage2'},
+                            #{'label': 'Stage2', 'value': 'stage2'},
                             {'label': 'CF2', 'value': 'cf2'},
                             {'label': "Semi-Stable", 'value': 'semi-stable'}
                         ],
@@ -707,7 +647,15 @@ main_page =     html.Div([
                     id="check_semantics2_style",
 
                     style={"display": "none"},
-                    ),],
+                    ),
+                    dcc.Checklist(
+                        id="default_params",
+                        options=[{"label": "use suggested parameters", "value": "use_bo"}],
+                        className="dcc_control",
+                        value=[],
+                        style={'height': '40px', 'marginLeft': '1.5%'}
+                    ),
+                        ],
                 className="row flex-display"
                 ),
                 dbc.Tooltip(
@@ -718,10 +666,10 @@ main_page =     html.Div([
                 html.Br(),
                 html.Div([
                     html.P("Eps:", style={"font-weight": "bold"}, className="dcc_control"),
-                    dcc.Input(id='eps', type="number", placeholder="1.7",style={'width': '22%','marginRight': '4%'}),
+                    dcc.Input(id='eps', type="number", placeholder="input eps",disabled=False, style={'width': '22%','marginRight': '4%'}),
                     dbc.Tooltip("DBscan  parameter, specifies the distance between two points to be considered within one cluster.suggested a decimal in range[1,3]", target="eps"),
                     html.P("MinPts:", style={"font-weight": "bold"}, className="dcc_control"),
-                    dcc.Input(id='minpts',  type="number", placeholder="7",style={'width': '22%'}),#style={'width': '10%','marginRight': '0.5%'}
+                    dcc.Input(id='minpts',  type="number", placeholder="input minpts",disabled=False,style={'width': '22%'}),#style={'width': '10%','marginRight': '0.5%'}
                     dbc.Tooltip("DBscan parameter, the minimum number of points to form a cluster. suggested an integer in range[3,15]", target="minpts"),
                 ],
 
@@ -729,7 +677,7 @@ main_page =     html.Div([
                 html.Br(),
                 html.Div([
                     html.P("Cluster Num", style={"font-weight": "bold"}, className="dcc_control"),
-                    dcc.Input(id='cluster_num', type="number", placeholder="2"),
+                    dcc.Input(id='cluster_num', type="number", placeholder="input cluster num",disabled=False),
                     dbc.Tooltip("Kmeans parameter, number of clusters, suggested an integer in range[2,15]", target="cluster_num"),
                 ],
                 className="row flex-display"),
@@ -820,12 +768,13 @@ main_page =     html.Div([
 
                 html.Div([
                             html.P("Derived Extensions"),
-                            html.Ul(id="extension-list", children=get_file_name(EXTENSION_DIR))
+                            html.Ul(id="extension-list", children=get_file_name(EXTENSION_DIR),style={'height':350,'overflowX':'scroll'}),
+                            #html.Pre(id='hover-data', children=get_file_name(EXTENSION_DIR),style=styles['pre'])
                         ],
                             className="pretty_container four columns"),
                 html.Div([
                             html.P("Processed Documents"),
-                            html.Ul(id="processed-list", children=get_file_name(ZIP_DIRECTORY))
+                            html.Ul(id="processed-list", children=get_file_name(ZIP_DIRECTORY),style={'height':350,'overflowX':'scroll'})
                         ],
                             className="pretty_container four columns"),
 
@@ -991,7 +940,7 @@ app.layout = html.Div([
 
 
 
-def global_individual(eps, minpts, n_cluster, semantics):
+def global_individual(eps, minpts, n_cluster, use_optim, semantics):
     files = uploaded_files(UPLOAD_DIRECTORY)
     start_time0 = time.process_time()
     question = ""
@@ -1015,18 +964,26 @@ def global_individual(eps, minpts, n_cluster, semantics):
         # zipname=files[0].strip("apx")+"zip"
     try:
        print('cleaned:', clean_folder(PROCESSED_DIRECTORY))
+       temp_para=[]
        for a_semantic in semantics:
-          extension=find_semantic_files(extensions,a_semantic)
-          if len(extensions) == 0:
-              process_extension_individual(question, a_semantic, PROCESSED_DIRECTORY, UPLOAD_DIRECTORY,
-                                           EXTENSION_DIR, eps,
-                                           minpts, n_cluster)
-              process_data_two_sets(PROCESSED_DIRECTORY, UPLOAD_DIRECTORY + question, EXTENSION_DIR + extension, eps, minpts,
-                                  n_cluster, a_semantic)
+
+          if len(extensions) == 0:                                      #note: 看看globalstore 有没有考虑到upload extensions的情况
+              extension=process_extension_individual(question, a_semantic, PROCESSED_DIRECTORY, UPLOAD_DIRECTORY,
+                                           EXTENSION_DIR)
+              #transfered,arguments, itemlist=initial_process_individual(PROCESSED_DIRECTORY, UPLOAD_DIRECTORY + question, EXTENSION_DIR + extension, a_semantic)
+
           else:
-              process_data_two_sets(PROCESSED_DIRECTORY, UPLOAD_DIRECTORY + question, UPLOAD_DIRECTORY + extension, eps,
-                                    minpts,
-                                    n_cluster, a_semantic)
+              extension = find_semantic_files(extensions, a_semantic)
+          transfered, arguments, itemlist = initial_process_individual(PROCESSED_DIRECTORY,
+                                                                           UPLOAD_DIRECTORY + question,
+                                                                           EXTENSION_DIR + extension, a_semantic)
+          temp_para.append({'semantic':a_semantic,'transfered':transfered,'arguments':arguments,'itemlist':itemlist})
+
+       get_catogery(PROCESSED_DIRECTORY, semantics)
+       for item in temp_para:
+            process_data_two_sets(PROCESSED_DIRECTORY, UPLOAD_DIRECTORY + question, item['transfered'], item['arguments'], item['itemlist'], eps,
+                             minpts,
+                             n_cluster, use_optim, item['semantic'])
        addional_process_individual(PROCESSED_DIRECTORY,semantics)
     except Exception as e:
         print('error:',e)
@@ -1037,7 +994,7 @@ def global_individual(eps, minpts, n_cluster, semantics):
 
     return True
 
-def global_store(eps, minpts, n_cluster, semantics):
+def global_store(eps, minpts, n_cluster, use_optim,semantics):
     # simulate expensive query
     files = uploaded_files(UPLOAD_DIRECTORY)
     question=""
@@ -1045,11 +1002,14 @@ def global_store(eps, minpts, n_cluster, semantics):
     start_time0 = time.process_time()
     try:
         apx_files=[]
+        extensions = []
         for x in files:
             if x.endswith('.apx'):
                 # Assume that the user uploaded a CSV file
                 question = x
                 apx_files.append(x)
+            else:
+                extensions.append(x)
 
 
     except Exception as e:
@@ -1059,69 +1019,42 @@ def global_store(eps, minpts, n_cluster, semantics):
         ])
         #zipname=files[0].strip("apx")+"zip"
     try:
-        end=""
-        if 'cf2_stage2' in semantics:
-
-            # extension_file1 = "{}.EE_{}".format(question, "STG2")
-            # extension_file2 = "{}.EE_{}".format(question, "CF2")
+        if len(extensions) == 0:
+            extension_dir=EXTENSION_DIR
+            end=""
+            # if 'cf2_stage2' in semantics:
             #
-            # process_data_two_sets(PROCESSED_DIRECTORY, UPLOAD_DIRECTORY + question, ZIP_DIRECTORY + extension_file1, eps, minpts,
-            #              n_cluster, "stage2")
-            # process_data_two_sets(PROCESSED_DIRECTORY, UPLOAD_DIRECTORY + question, ZIP_DIRECTORY + extension_file2, eps,
-            #              minpts, n_cluster, "cf2")
-            # addional_process_individual(PROCESSED_DIRECTORY, semantics)
-            return global_individual(eps, minpts, n_cluster, ["cf2","stage2"])
-            # processed_data_stage2= pd.read_pickle(PROCESSED_DIRECTORY + "stage2_processed_data.pkl")
-            # processed_data_cf2= pd.read_pickle(PROCESSED_DIRECTORY + "cf2_processed_data.pkl")
-            # # X_train,  y_test = train_test_split(processed_data2, test_size=0.33)
-            # # y_test.to_pickle(PROCESSED_DIRECTORY +"cf2_processed_data_small.pkl")
-            # arguments=processed_data_stage2.arg.append(processed_data_cf2.arg)
-            # common_all=set(arguments[0]).intersection(*arguments)
             #
-            # feature1=find_feature_group(common_all,processed_data_stage2, processed_data_cf2)
-            # feature2=find_feature_group(common_all,processed_data_cf2, processed_data_stage2)
-            # sum_diff = pd.DataFrame({
-            #     "semantics": ["stage2","cf2"],
-            #     "feature_arguments": [feature1,feature2],
-            # })
-            # sum_diff.to_pickle(PROCESSED_DIRECTORY + "group_feature.pkl")
-            # common_data = pd.merge(processed_data_cf2, processed_data_stage2, on=['arg'], how='inner')
-            # present_data1 = processed_data_cf2[~processed_data_cf2.id.isin(common_data.id_x)]
-            # present_data1["category"] = "only_cf2"
-            # present_data2 = processed_data_stage2[~processed_data_stage2.id.isin(common_data.id_y)]
-            # present_data2["category"] = "only_stage2"
-            # present_common = processed_data_cf2[processed_data_cf2.id.isin(common_data.id_x)]
-            # present_common["category"] = "cf2 and stage2"
-            # color_label = "category"
-            # processed_data = pd.concat([present_data1, present_data2, present_common])
-            # processed_data.to_pickle(PROCESSED_DIRECTORY + "combined_processed_data.pkl")
+            #     return global_individual(eps, minpts, n_cluster,use_optim, ["cf2","stage2"])
 
-
-        elif "preferred_stable" in semantics:
-            asp_encoding="prefex.dl"
-            end="PR"
-        elif "stable_stage" in semantics:
-            asp_encoding="stage-cond-disj.dl"
-            end="STG"
-        elif "stage2_stable" in semantics:
-            asp_encoding="stage2_gringo_versus_stable.lp"
-            end="STG2"
-        elif "stable_cf2" in semantics:
-            asp_encoding="cf2_gringo_versus_stable.lp"
-            end="CF2"
-        elif "semi-stable_preferred" in semantics:
-            pass
-        extension_file="{}.EE_{}".format(question, end)
-        #manager = Manager()
-        # string = []
-        # P = Process(target=compute_extensions, args=(UPLOAD_DIRECTORY +question,asp_encoding,EXTENSION_DIR+extension_file,string))
-        #
-        # P.start()
-        compute_extension_result=compute_extensions(UPLOAD_DIRECTORY +question,asp_encoding,EXTENSION_DIR+extension_file)
-        #print("done\n : string is ",string)
-        if compute_extension_result=='oversize': #len(string) >0 and string[0]=='oversize':
-            return 'oversize'
-
+            if "preferred_stable" in semantics:
+                asp_encoding="prefex.dl"
+                end="PR"
+            elif "stable_stage" in semantics:
+                asp_encoding="stage-cond-disj.dl"
+                end="STG"
+            # elif "stage2_stable" in semantics:
+            #     asp_encoding="stage2_gringo_versus_stable.lp"
+            #     end="STG2"
+            elif "stable_cf2" in semantics:
+                asp_encoding="cf2_gringo_versus_stable.lp"
+                end="CF2"
+            elif "semi-stable_preferred" in semantics:
+                pass
+            extension_file="{}.EE_{}".format(question, end)
+            #manager = Manager()
+            # string = []
+            # P = Process(target=compute_extensions, args=(UPLOAD_DIRECTORY +question,asp_encoding,EXTENSION_DIR+extension_file,string))
+            #
+            # P.start()
+            compute_extension_result=compute_extensions(UPLOAD_DIRECTORY +question,asp_encoding,EXTENSION_DIR+extension_file)
+            #print("done\n : string is ",string)
+            if compute_extension_result=='oversize': #len(string) >0 and string[0]=='oversize':
+                return 'oversize'
+        else:
+            extension_dir=UPLOAD_DIRECTORY
+            extension_file = extensions[0]
+            compute_extension_result='finished' #之前已经计算过extension， 不需要再来一次了
 
     except Exception as e:
         print('error:',e)
@@ -1132,15 +1065,21 @@ def global_store(eps, minpts, n_cluster, semantics):
         print("finish extensions computing:", time.process_time() - start_time0)
         start_time = time.process_time()#time.time()
         print("start process")
-        if not process_data(PROCESSED_DIRECTORY,UPLOAD_DIRECTORY+question, EXTENSION_DIR+extension_file,eps, minpts, n_cluster,semantics):
+
+        result=process_data(PROCESSED_DIRECTORY,UPLOAD_DIRECTORY+question, extension_dir+extension_file,eps, minpts, n_cluster,use_optim,semantics)
+        if not result:
             return html.Div([
                 'no extensions exist for the selected semantics'
+            ])
+        elif result=='parameter_mistakes':
+            return html.Div([
+                'parameter mistakes'
             ])
         #process_data(PROCESSED_DIRECTORY, UPLOAD_DIRECTORY + question, UPLOAD_DIRECTORY + stg_answer, eps, minpts, n_cluster)
 
         print("(whole)get processed data", time.process_time() - start_time) #time.time() - start_time)
         if compute_extension_result == 'finished':
-            return True
+            return result
     else:
         print("the form of input file is not correct.")
         return False
@@ -1161,11 +1100,20 @@ def show_other_option(semantics):
 
     return {'display': 'none'}
 
+
+# @app.callback(Output('clustering-method', 'options') ,[Input("memory-semantic", "data")])
+# def show_other_option(semantics):
+#     if len(semantics)<2:
+#         return dash.exceptions.PreventUpdate
+#     else:
+#      return semantics
+
+
 @app.callback([Output('signal', 'children'),Output('memory-semantic', 'data'),] ,[Input('submit-button-state', 'n_clicks'),Input("check_semantics", "value")],
-              [State('eps', 'value'), State('minpts', 'value'), State('cluster_num', 'value'),State('store-prev-comparisons', 'data')])
-def compute_value( n_clicks, semantics,  eps, minpts, n_cluster,semantics2):
+              [State("default_params", "value"),State('eps', 'value'), State('minpts', 'value'), State('cluster_num', 'value'),State('store-prev-comparisons', 'data')])
+def compute_value( n_clicks, semantics, use_optim, eps, minpts, n_cluster,semantics2):
     # compute value and send a signal when done
-    print("clickes1: ",n_clicks)
+
     if len(os.listdir(UPLOAD_DIRECTORY)) == 0:
         print("return no content")
         return "", None   #haven't upload data
@@ -1173,49 +1121,24 @@ def compute_value( n_clicks, semantics,  eps, minpts, n_cluster,semantics2):
             if semantics=="others":
                 if semantics2 is None:
                     raise dash.exceptions.PreventUpdate
-                return global_individual(eps, minpts, n_cluster, semantics2), semantics2
+                return global_individual(eps, minpts, n_cluster,use_optim, semantics2), semantics2
             if int(n_clicks)>0:
                 # if len(os.listdir(PROCESSED_DIRECTORY)) != 0:
                 #     clean_folder(PROCESSED_DIRECTORY)
 
-                return [global_store(eps, minpts, n_cluster, semantics),semantics]
+                return [global_store(eps, minpts, n_cluster,use_optim, semantics),semantics]
             return "",semantics
        #already  process, no need to pass data again
     # global_store(value)
     # return value
 
 
-# @app.callback([Output('store-prev-comparisons', 'data')],
-#                      [Input('check_semantics', 'value'),Input('check_semantics2', 'value'),Input('submit-button-state', 'n_clicks')],
-#                      [State('store-prev-comparisons', 'data')])
-# def select_comparison(semantic1,comparisons, submit_click, prev_comparisons):
-#   print('clicks3:',submit_click)
-#
-#   if semantic1== None:
-#       raise dash.exceptions.PreventUpdate
-#   if semantic1!='others' or comparisons is None:  # on page load
-#       return dash.no_update
-#   if submit_click==0:
-#       return dash.no_update
-#   if len(comparisons) == 3 or len(comparisons) == 2:
-#     # changes store-prev-comparisons which triggers above callback
-#     return comparisons[0:2],
-#   elif comparisons == prev_comparisons:
-#      # this only happens if we just trimmed so don't do anything to break circularity
-#      raise dash.exception.PreventUpdate
-#
-#   elif len(comparisons) ==1:
-#       print("comparison:",comparisons)
-#       return comparisons
-#
-#   else:
-#     # when <= 3 don't modify store-prev-comparisons and therefore don't trigger above
-#     raise dash.exceptions.PreventUpdate#dash.no_update
+
 
 @app.callback([Output('store-prev-comparisons', 'data')],
                      [Input('check_semantics', 'value'),Input('check_semantics2', 'value'),Input('submit-button-state', 'n_clicks')])
 def select_comparison(semantic1,comparisons, submit_click):
-  print('clicks3:',submit_click)
+
 
   if semantic1== None or submit_click==0:
       raise dash.exceptions.PreventUpdate
@@ -1255,7 +1178,7 @@ def update_output(clear_click,children,uploaded_filenames,uploaded_ex_filenames,
                 #save_file(name, data, EXTENSION_DIR)
 
     if uploaded_ex_filenames is not None and uploaded_ex_file_contents is not None:
-            for name, data in zip(uploaded_filenames, uploaded_file_contents):#[],[]
+            for name, data in zip(uploaded_ex_filenames, uploaded_ex_file_contents):#[],[]
                 save_file(name, data, UPLOAD_DIRECTORY)
 
     files = uploaded_files(UPLOAD_DIRECTORY)
@@ -1383,7 +1306,7 @@ def chnage_selection(semantic_checks, signal_content):
         else:
             semantics=get_current_processed_dir_semantic(PROCESSED_DIRECTORY)
 
-            return [{"label": semantics[0], "value": semantics[0]}, {"label":semantics[1], "value": semantics[1]}],{}
+            return [{"label": semantics[0], "value": semantics[0]}, {"label":semantics[1], "value": semantics[1]}],{'marginLeft': '2%', 'width': '18%'}
 
 
     return [],{"display": "none"}
@@ -1490,19 +1413,19 @@ def generate_tabs1( content, reduction1,  method, n_click,semantic, present_sema
                Output('upload_block','style'), Output('options-visualization','style')],
               [Input('signal', 'children'),
                Input('visual-dropdown', 'value'),
-
+               Input("semantic-method-1", "value"),
                Input("dimensional-reduction1", "value"),
                Input("clustering-method", "value"),
                Input('confirm', 'submit_n_clicks')]
                #Input('memory-semantic', 'data')],
 
               )
-def generate_tabs(content, selected_visual, reduction2, cluster_method, n_click):
+def generate_tabs(content, selected_visual, semantic, reduction2, cluster_method, n_click):
             if selected_visual=='dropdown-2d':
                 fig=generate_tabs2(content,reduction2, cluster_method, n_click)
                 return fig,{'display':'block'},{},{},{'display':'none'},{'display':'none'},{'display':'none'},{'display':'flex','position': 'relative' }
             elif selected_visual=='dropdown-3d':
-                fig1,fig2=display3d(reduction2, cluster_method)
+                fig1,fig2=display3d(reduction2, semantic, cluster_method)
                 return {},{'display':'none'},fig1,fig2,{'display':'block'},{'display':'block'},{'display':'none'},{'display':'flex','position': 'relative' }
             elif selected_visual=='upload-user':
                 return {},{'display':'none'},{}, {},{'display':'none'},{'display':'none'},{'display':'block'},{'display':'none'}
@@ -1514,7 +1437,7 @@ def generate_tabs(content, selected_visual, reduction2, cluster_method, n_click)
 # @cache.memoize(TIMEOUT)
 def generate_tabs2(content, reduction2, method, n_click):  # method):
 
-    if len(os.listdir(PROCESSED_DIRECTORY)) == 12: #or semantic =="cf2_stage2":
+    if len(os.listdir(PROCESSED_DIRECTORY)) == 12 and os.path.isfile(PROCESSED_DIRECTORY + "CombinedProcessed_data.pkl"): #or semantic =="cf2_stage2":
 
         color_label="category"
         processed_data=pd.read_pickle(PROCESSED_DIRECTORY + "CombinedProcessed_data.pkl")#pd.concat([present_data1,present_data2,present_common])
@@ -1572,7 +1495,7 @@ def generate_tabs2(content, reduction2, method, n_click):  # method):
                 size=15,
                 color=processed_data[processed_data[color_label] == x]['color'],
                 # colorscale='Viridis',
-                opacity=0.06
+                #opacity=0.15
             ),
             # marker=dict(
             #     color=processed_data[processed_data[color_label] == x]['color'],
@@ -1587,7 +1510,7 @@ def generate_tabs2(content, reduction2, method, n_click):  # method):
     cluster_set = list(processed_data[cluster_label].unique())
 #    colors=get_colors(len(cluster_set))#['blue','red','green','yellow']
     num_color=len(cluster_set)
-    if num_color>25:
+    if num_color>8:
         colors=get_colors(len(cluster_set))#['rgb'+str(x) for x in sns.color_palette(n_colors=len(cluster_set))]
     else:
         colors=[WELL_COLOR_new[i] for i in range(num_color)]
@@ -1835,7 +1758,7 @@ def set_bar_figure(argument_data, valuelist):
         [State('signal', 'children')]
               )
 def show_confirm(n_clicks,value):
-    print('clicks2',n_clicks)
+
     if n_clicks>0:
         if value=='oversize':
             return True, False, False
@@ -1856,6 +1779,19 @@ def show_confirm(value):
             print("test:", value)
             return True
     return False
+
+
+@app.callback(
+    [Output("eps", "disabled"),Output("minpts", "disabled"),Output('cluster_num', "disabled")],
+    [Input("default_params", "value")],
+    )
+@cache.memoize(TIMEOUT)
+def make_bar_figure(defaut_params):
+    print("default param",defaut_params)
+    if not defaut_params:
+        return False,False,False #for now
+    else:
+        return True,True,True
 
 
 @app.callback(Output('hidden-div', 'figure'),
@@ -1898,10 +1834,6 @@ def update_output(children1, children2, n_click):
         Output('info-container', 'children')
         ,Output("pie_graph", "figure")],
     [Input('bar_chart', 'clickData') ,Input("clustering-method","value")]) #Input("check_semantics","value")
-
-
-
-
 
 
 def update_cluster_rate(clickData, cluster_method):
@@ -1983,7 +1915,7 @@ def update_cluster_rate(clickData, cluster_method):
         num = len(data[data[cluster_label] == cluster])
         result["num"].append(num)
         # result["rate"].append(num/len(data))
-    if len(clusters) > 25:
+    if len(clusters) > 8:
         r = lambda: random.randint(0, 255)
         data_bar = [
             dict(
@@ -2110,16 +2042,30 @@ def update_graph(clickData, dimensional_reduction, cluster_method):
 # @app.callback([Output('3d_scatter_cluster', 'figure'),Output('3d_scatter_group', 'figure'),Output('3d_scatter_cluster', 'style'),Output('3d_scatter_group', 'style')],
 #             [ Input('dropdown-3d', 'n_clicks'),Input('dropdown-2d', 'n_clicks'), Input("dimensional-reduction1","value"), Input("clustering-method","value"),]
 #               )
-def display3d( reduction_method, cluster_method):
+def display3d( reduction_method, semantics,cluster_method):
     #print("3d click:", selected_3d)
+    if len(os.listdir(PROCESSED_DIRECTORY)) == 12:  # or semantic == "cf2_stage2":
+        try:
+            data = pd.read_pickle(PROCESSED_DIRECTORY + semantics + "_processed_data.pkl")
+            group_label='category'
+        except IOError:
+            print("File not accessible")
 
-    if os.listdir(PROCESSED_DIRECTORY)==5:  # load and processed
-
-            data = pd.read_pickle(PROCESSED_DIRECTORY + "processed_data.pkl")
 
     else:
+        group_label = 'groups'
+        if len(os.listdir(PROCESSED_DIRECTORY)) == 6:  # load and processed
+            data = pd.read_pickle(PROCESSED_DIRECTORY + "processed_data.pkl")
+        else:
+            data = pd.read_pickle(DEFAULT_DATA + 'processed_data.pkl')
 
-            data = pd.read_pickle(DEFAULT_DATA + "processed_data.pkl")
+    # if os.listdir(PROCESSED_DIRECTORY)==5:  # load and processed
+    #
+    #         data = pd.read_pickle(PROCESSED_DIRECTORY + "processed_data.pkl")
+    #
+    # else:
+    #
+    #         data = pd.read_pickle(DEFAULT_DATA + "processed_data.pkl")
 
     if reduction_method=="svd":
         x_axe="svd_position_x"
@@ -2132,6 +2078,8 @@ def display3d( reduction_method, cluster_method):
         y_axe = "auto_position_y"
     cluster_label = cluster_method + "_cluster_label"
     cluster_set = data[cluster_label].unique()
+    print('cluster selected:', cluster_label)
+    print('cluster label:', cluster_set)
     # fig = go.Figure(go.Scatter3d(
     #     x=data[x_axe],
     #     y=data[y_axe],
@@ -2167,6 +2115,7 @@ def display3d( reduction_method, cluster_method):
         cluster_symbol=symbols
     else:
         cluster_symbol=[None]*len(cluster_set)
+    print('cluster_symbol:', cluster_symbol)
     fig = go.Figure(data=[go.Scatter3d(
             x=data[data[cluster_label]==cls][x_axe],
             y=data[data[cluster_label]==cls][y_axe],
@@ -2177,13 +2126,13 @@ def display3d( reduction_method, cluster_method):
             text=data[data[cluster_label]==cls].id,
             #text=["cluster: {}".format(x) for x in data[data[cluster_label]==cls][cluster_label]],
             mode='markers',
-            name="cluster"+str(cls),
+            name="cluster"+str(cls+1),
             marker=dict(
                 size=3,
                 color=cls,  # set color to an array/list of desired values
                 colorscale='Viridis',  # choose a colorscale
                 opacity=0.8,
-                symbol=cluster_symbol[cls]
+                symbol=cluster_symbol[cls-1]
             ),
 
         ) for cls in cluster_set
@@ -2197,26 +2146,26 @@ def display3d( reduction_method, cluster_method):
                 size=20,
             )
         ),
-
+            #'marginLeft': '2%',打算以后加
             autosize=False,
-            width=700,
+            width=650,
             height=700,
             showlegend=True,
         )
     )
 
-    group_set = data["groups"].unique()
+    group_set = data[group_label].unique()
     fig2 = go.Figure(data=[go.Scatter3d(
-        x=data[data["groups"] == cls][x_axe],
-        y=data[data["groups"] == cls][y_axe],
-        z=[len(set(s)) for s in data[data["groups"] == cls]["arg"]],
-        # text=["groups: {}".format(x) for x in data[data["groups"] == cls]["groups"]],
+        x=data[data[group_label] == cls][x_axe],
+        y=data[data[group_label] == cls][y_axe],
+        z=[len(set(s)) for s in data[data[group_label] == cls]["arg"]],
+        # text=["groups: {}".format(x) for x in data[data[group_label] == cls][group_label]],
 
-        customdata=['<br>' + s for s in inputdata[inputdata["groups"] == cls]["arguments"]],
+        customdata=['<br>' + s for s in inputdata[inputdata[group_label] == cls]["arguments"]],
         hovertemplate='Id:%{text}</b><br>length:%{z} <br></b>Arguments:%{customdata} ',
-        text=data[data["groups"] == cls].id,
+        text=data[data[group_label] == cls].id,
         mode='markers',
-        name="group " + str(cls),
+        name=group_label + str(cls),
         marker=dict(
             size=3,
             #color=cls,  # set color to an array/list of desired values
@@ -2235,7 +2184,7 @@ def display3d( reduction_method, cluster_method):
                                 )
                         ),
                         autosize=False,
-                        width=700,
+                        width=650,
                         height=700,
                         showlegend=True,
     ))
