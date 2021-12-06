@@ -689,81 +689,7 @@ main_page =     html.Div([
             ],
             className="row flex-display"
             ),
-            # dcc.Tab(label='PROCESSED', children=[
-            #     html.Span("Semantics:", style={"font-weight": "bold",'marginLeft': '0.5%'}),
-            #
-            #     # html.Div(
-            #     #     [
-            #             dcc.Dropdown(
-            #     id="check_semantics",
-            #     options=[
-            #         {'label': 'Preferred and Stable', 'value': 'preferred_stable'},
-            #         {'label': 'Stable and Stage', 'value': 'stable_stage'},
-            #         {'label': 'Stable and Stage2', 'value': 'stage2_stable'},
-            #         {'label': 'Stable and CF2', 'value': 'stable_cf2'},
-            #         {'label': 'Stage2 and CF2', 'value': 'cf2_stage2'},
-            #         {'label':"Semi-Stable and Preferred", 'value':'semi-stable_preferred'},
-            #         {'label':"Others", 'value':'others'}
-            #     ],
-            #     value=['preferred_stable'],
-            #     placeholder="Select semantics",
-            #     style={'height': '30px', 'width': '200px'}
-            #     ) ,
-            #     dcc.Store(id='memory-semantic'),
-            #     #     ],
-            #     # style={"width": "17%"},
-            #     # ),
-            #     html.Div(
-            #         [
-            #     # dcc.Checklist(
-            #     #     id="check_semantics2",
-            #     #     options=[
-            #     #         {'label': 'Preferred ', 'value': 'preferred'},
-            #     #         {'label': 'Stable', 'value': 'stable'},
-            #     #         {'label': 'Stage', 'value': 'stage'},
-            #     #         {'label': 'Stage2', 'value': 'stage2'},
-            #     #         {'label': 'CF2', 'value': 'cf2'},
-            #     #         {'label': "Semi-Stable", 'value': 'semi-stable'}
-            #     #     ],
-            #     #     value=[],
-            #     #     labelStyle={'display': 'inline-block'},
-            #     #    # style={'width': '17%'},
-            #     #
-            #     # ),
-            #
-            #     dcc.Dropdown(
-            #         id="check_semantics2",
-            #         options=[
-            #             {'label': 'Preferred ', 'value': 'preferred'},
-            #             {'label': 'Stable', 'value': 'stable'},
-            #             {'label': 'Stage', 'value': 'stage'},
-            #             {'label': 'Stage2', 'value': 'stage2'},
-            #             {'label': 'CF2', 'value': 'cf2'},
-            #             {'label': "Semi-Stable", 'value': 'semi-stable'}
-            #         ],
-            #         placeholder="Select Semantics",
-            #         #value=['MTL', 'NYC'],
-            #         multi=True
-            #     )
-            #
-            #         ],
-            #     id="check_semantics2_style",
-            #
-            #     style={"display": "none"},
-            #     ),
-            #     dbc.Tooltip(
-            #         "you can choose one or two semantics",
-            #         target="check_semantics2_style"),
-            #
-            #     dcc.Store(id="store-prev-comparisons"),
-            #     dcc.Input(id='eps', type='text', value='Eps',style={'width': '10%','marginRight': '0.5%','marginLeft': '4%'}),
-            #     dbc.Tooltip("DBscan  parameter, specifies the distance between two points to be considered within one cluster.suggested a decimal in range[1,3]", target="eps"),
-            #     dcc.Input(id='minpts', type='text', value='MinPts',style={'width': '10%','marginRight': '0.5%'}),
-            #     dbc.Tooltip("DBscan parameter, the minimum number of points to form a cluster. suggested an integer in range[3,15]", target="minpts"),
-            #     dcc.Input(id='cluster_num', type='text', value='Cluster Num',style={'width': '11%','marginRight': '0.5%'}),
-            #     dbc.Tooltip("Kmeans parameter, number of clusters, suggested an integer in range[2,15]", target="cluster_num"),
-            #
-            #     html.Button(id='submit-button-state', n_clicks=0, children='Submit',className="learn-more-button"),]),
+
             dcc.Tab(label='PROCESSED', children=[
 
                 html.Div([
@@ -967,7 +893,7 @@ def global_individual(eps, minpts, n_cluster, use_optim, semantics):
        temp_para=[]
        for a_semantic in semantics:
 
-          if len(extensions) == 0:                                      #note: 看看globalstore 有没有考虑到upload extensions的情况
+          if len(extensions) == 0:
               extension=process_extension_individual(question, a_semantic, PROCESSED_DIRECTORY, UPLOAD_DIRECTORY,
                                            EXTENSION_DIR)
               #transfered,arguments, itemlist=initial_process_individual(PROCESSED_DIRECTORY, UPLOAD_DIRECTORY + question, EXTENSION_DIR + extension, a_semantic)
@@ -2106,7 +2032,7 @@ def display3d( reduction_method, semantics,cluster_method):
                      i in range(0, len(arg_list), 6)) for x in y]
         one_arg = str(inserted_arg).strip('[]')
         #input_arg=f_comma(one_arg, group=20, char='<br>')
-        input_arg=one_arg.strip('"') #没用 ，去吃str里的‘
+        input_arg=one_arg.strip('"') #remove ' from string
         text_list.append(input_arg)
 
     inputdata["arguments"]=text_list
@@ -2146,7 +2072,7 @@ def display3d( reduction_method, semantics,cluster_method):
                 size=20,
             )
         ),
-            #'marginLeft': '2%',打算以后加
+            #'marginLeft': '2%',# tobe added
             autosize=False,
             width=650,
             height=700,
