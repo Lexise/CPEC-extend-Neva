@@ -76,7 +76,7 @@ def process_extension_individual(question, item, processed_dir, upload_dir, exte
 
 
 
-def find_semantic_files(files,item):#找对应的extension文件
+def find_semantic_files(files,item):#find corresponding extension file
     if item == 'stable':
 
         end = "STB"
@@ -272,8 +272,6 @@ def process_data(dir, arguments_file, answer_sets, eps, minpts, n_cluster, use_o
         #middle = 'cf2 and stable'
     else:
         raise Exception
-    #elif 'cf2_stage2' in semantic:
-         #要不要用“groups”作为区分 only cf2, cf2 _stage2的标准
 
     not_defeated1 = []
     for s in test:
@@ -436,7 +434,7 @@ def dimensional_reduction_autoencoding(data, processed_data)->pd.DataFrame:
     decoder =Model(encoded_input, decoder_layer(encoded_input))
 
     autoencoder.compile(optimizer='adadelta', loss='binary_crossentropy')
-    autoencoder.fit(data, data,#可能要dataz这个形式有问题，下载然后
+    autoencoder.fit(data, data,
                     epochs=150, #50
                     batch_size=256,
                     shuffle=True,
@@ -494,7 +492,7 @@ def find_feature_cluster(common_all, data, labels):  #clustered data
         # if any(mask):
         #     feature = list(itertools.compress(common_links, mask))
 
-        #2021.02.21 对于单一的feature的处理
+        #2021.02.21 for single feature
         has_single_feature=0
         other_cluster_arg_flat_list = [x for x in data[data[labels] != cluster].arg]
         other_cluster_arg_combine = set([item for sublist in other_cluster_arg_flat_list for item in sublist])
@@ -566,7 +564,7 @@ def find_feature_group(common_all, data, otherdata):  #clustered data
             for x in range(len(common_links), 1, -1):
                 temp = False
                 combinitions = list(
-                    itertools.combinations(common_links, x - 1))  # 对于15长度的common_links, 3003 for x =11  太多了
+                    itertools.combinations(common_links, x - 1))  # for common_links whose length is bigger than 15, 3003 iteration for x =11. Just too many
                 for combine in combinitions:
                     combine = set(combine)
                     if not any(combine.issubset(x) for x in other_cluster_arg):
@@ -704,7 +702,7 @@ def process_data_two_sets(dir, arguments_file, transfered, arguments, itemlist, 
     print("dbscan clustering: ", time.process_time() - start2)
 
     processed_data = dimensional_reduction(processed_data)
-    y = np.array([np.array(xi) for xi in transfered])    #to change and test###############减少需要内存大小
+    y = np.array([np.array(xi) for xi in transfered])    #descreaed required memory size
     processed_data =dimensional_reduction_autoencoding(y, processed_data)
     #processed_data =dimensional_reduction_autoencoding(for_auto_reduction, processed_data)
     start3 = time.process_time()

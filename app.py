@@ -1405,7 +1405,7 @@ def generate_tabs2(content, reduction2, method, n_click):  # method):
 
     fig = go.Figure()
 
-    # 加点（group points）
+    # add points (groups)
     groups_set = np.sort(processed_data[color_label].unique())
     get_color_label(processed_data, color_label, groups_set)
 
