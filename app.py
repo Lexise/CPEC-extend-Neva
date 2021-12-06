@@ -980,7 +980,7 @@ def global_store(eps, minpts, n_cluster, use_optim,semantics):
         else:
             extension_dir=UPLOAD_DIRECTORY
             extension_file = extensions[0]
-            compute_extension_result='finished' #之前已经计算过extension， 不需要再来一次了
+            compute_extension_result='finished' #extension already be calculated, no need to do it again
 
     except Exception as e:
         print('error:',e)
