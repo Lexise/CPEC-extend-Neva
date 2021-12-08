@@ -2,6 +2,7 @@ import os
 from os import listdir,unlink,walk
 from os.path import isfile, join
 import base64
+from pathlib import Path
 def clean_folder(folder_path):
     if len(listdir(folder_path))!=0:
         removed=[]
@@ -19,6 +20,7 @@ def clean_folder(folder_path):
 
 def uploaded_files( directory ):
     """List the files in the upload directory."""
+    Path(directory).mkdir(parents=True, exist_ok=True)
     files = []
     for filename in os.listdir(directory):
         path = os.path.join(directory, filename)
