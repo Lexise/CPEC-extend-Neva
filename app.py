@@ -23,7 +23,7 @@ from flask_caching import Cache
 from flask import Flask, send_from_directory,request
 from clustering_correlation import compute_serial_matrix,innovative_correlation_clustering,my_optimal_leaf_ordering,abs_optimal_leaf_ordering
 import numpy as np
-from process_data import  process_data,clean_folder,get_color_label, find_feature_group, process_data_two_sets,\
+from process_data import process_data,clean_folder,get_color_label, find_feature_group, process_data_two_sets,\
     addional_process_individual, process_extension_individual,get_colors,find_semantic_files,get_catogery,initial_process_individual
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 import copy
@@ -90,6 +90,14 @@ def download(path):
         return send_from_directory(ZIP_DIRECTORY, path, as_attachment=True)
     else:
         return send_from_directory(DEFAULT_DATA, path, as_attachment=True)
+
+
+
+@server.route("/hello")
+def hello():
+    """Serve a file from the upload directory."""
+    return 'hello world'
+
 
 # @server.route("/")
 # def query_progress():
@@ -449,10 +457,11 @@ main_page =     html.Div([
 
                     html.Div([
                     dcc.Graph(id="3d_scatter_cluster",className="row flex-display",style={'display':'none'}),
+                    html.Br(),
                     dcc.Graph(id="3d_scatter_group", className="row flex-display",style={'display':'none'}),
                     ],
 
-                    className="flex-display"
+                    className="row flex-display"
                 ),
 
 
@@ -1349,7 +1358,7 @@ def generate_tabs1( content, reduction1,  method, n_click,semantic, present_sema
 def generate_tabs(content, selected_visual, semantic, reduction2, cluster_method, n_click):
             if selected_visual=='dropdown-2d':
                 fig=generate_tabs2(content,reduction2, cluster_method, n_click)
-                return fig,{'display':'block'},{},{},{'display':'none'},{'display':'none'},{'display':'none'},{'display':'flex','position': 'relative' }
+                return fig,{'display':'block'},{},{},{'display':'none','marginLeft':'20px','marginRight':'20px'},{'display':'none'},{'display':'none'},{'display':'flex','position': 'relative' }
             elif selected_visual=='dropdown-3d':
                 fig1,fig2=display3d(reduction2, semantic, cluster_method)
                 return {},{'display':'none'},fig1,fig2,{'display':'block'},{'display':'block'},{'display':'none'},{'display':'flex','position': 'relative' }
@@ -1581,13 +1590,21 @@ def generate_tabs2(content, reduction2, method, n_click):  # method):
 @cache.memoize(TIMEOUT)
 def make_bar_figure(present_data, valuelist,sort_state):
 
+    if len(os.listdir(PROCESSED_DIRECTORY)) == 12 and os.path.isfile(PROCESSED_DIRECTORY + "CombinedProcessed_data.pkl"): #change it later
 
-    if os.listdir(PROCESSED_DIRECTORY):  # load and processed
-            dataset_bar = pd.read_pickle(PROCESSED_DIRECTORY + "bar_data.pkl")
+
+        processed_data=pd.read_pickle(PROCESSED_DIRECTORY + "CombinedProcessed_data.pkl")#pd.concat([present_data1,present_data2,present_common])
+
 
     else:
+        color_label = "groups"
+        if len(os.listdir(PROCESSED_DIRECTORY)) == 6:  # load and processed
+                dataset_bar = pd.read_pickle(PROCESSED_DIRECTORY + "bar_data.pkl")
 
-            dataset_bar = pd.read_pickle(DEFAULT_DATA+'bar_data.pkl')
+        else:
+                dataset_bar = pd.read_pickle(DEFAULT_DATA+'bar_data.pkl')
+
+
 
     slider=dict(
         min = 0,
@@ -1777,7 +1794,7 @@ def update_cluster_rate(clickData, cluster_method):
     if clickData is None:
         return "Selected Argument: None",mini_block,dict(data=None, layout=layout_pie),
     temp=clickData["points"][0]
-    arguments=int(re.search(r'\d+', temp["x"]).group())
+    arguments=re.search(r'\d+', temp["x"]).group()  #int()
     selected=[]
     result0= "Selected Argument:{}  \n".format(arguments)
     for index, row in process_data.iterrows():
@@ -1918,7 +1935,7 @@ def update_graph(clickData, dimensional_reduction, cluster_method):
         }
     temp=clickData["points"][0]
     cluster_label=cluster_method +"_cluster_label"
-    arguments=int(re.search(r'\d+', temp["x"]).group())
+    arguments=re.search(r'\d+', temp["x"]).group()#int()
     selected=[]
     for index, row in process_data.iterrows():
         if arguments in row.arg:
@@ -2072,7 +2089,7 @@ def display3d( reduction_method, semantics,cluster_method):
                 size=20,
             )
         ),
-            #'marginLeft': '2%',# tobe added
+
             autosize=False,
             width=650,
             height=700,
@@ -2101,7 +2118,7 @@ def display3d( reduction_method, semantics,cluster_method):
     ) for cls in group_set
     ],
     layout=go.Layout( title=dict(
-                                text='Groups Distribution',
+                                text='Semantics Distribution',
                                 xref="paper",
                                 yref="paper",
                                 #x=0.5,
@@ -2110,7 +2127,7 @@ def display3d( reduction_method, semantics,cluster_method):
                                 )
                         ),
                         autosize=False,
-                        width=650,
+                        width=650,#700,
                         height=700,
                         showlegend=True,
     ))

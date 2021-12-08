@@ -23,6 +23,12 @@ from clingo_asp_compute import compute_extensions
 
 import random
 
+# class Person:
+#   def __init__(self, stage, age):
+#     self.stage = stage
+#     self.age = age
+
+
 
 def get_colors(n):
     ret = []
