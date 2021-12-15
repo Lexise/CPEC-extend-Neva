@@ -66,13 +66,13 @@ class Process_data:
 
 
 
-    def process_extension_individual(self,question, item, processed_dir, upload_dir, extenion_dir): # for "other" situation, when user want to select their own semantics or semantic pairs
+    def process_extension_individual(self,question, item, processed_dir, upload_dir, extenion_dir,aps_dir): # for "other" situation, when user want to select their own semantics or semantic pairs
 
             if item == 'stable':
                 asp_encoding = "stable_web.dl"
                 end = "STB"
             elif item == 'preferred':
-                asp_encoding = "prefex.dl"
+                asp_encoding = "preferred-cond-disj.dl"
                 end = "PR"
             elif item == 'stage':
                 asp_encoding = "stage-cond-disj.dl"
@@ -91,7 +91,7 @@ class Process_data:
                 return False
             extension_file = "{}.EE_{}".format(question, end)
             self.stage='extension computing of a single semantics'
-            compute_extensions(upload_dir +question,asp_encoding,extenion_dir+extension_file)
+            compute_extensions(upload_dir +question,aps_dir+asp_encoding,extenion_dir+extension_file)
 
             return extension_file
             # os.system(

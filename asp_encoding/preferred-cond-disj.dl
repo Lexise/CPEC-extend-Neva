@@ -1,0 +1,14 @@
+in(X) :- not out(X), arg(X).
+out(X) :- not in(X), arg(X).
+:- in(X), in(Y), att(X,Y).
+defeated(X) :- in(Y), att(Y,X).
+not_defended(X) :- att(Y,X), not defeated(Y).
+:- in(X), not_defended(X).
+not_trivial :- out(X).
+ecl(X) : out(X) :- not_trivial.
+spoil | ecl(Z) : att(Z,Y) :- ecl(X), att(Y,X).
+spoil :- ecl(X), ecl(Y), att(X,Y).
+spoil :- in(X), ecl(Y), att(X,Y).
+ecl(X) :- spoil, arg(X).
+:- not spoil, not_trivial.
+#show in/1.

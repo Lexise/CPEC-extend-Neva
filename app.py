@@ -39,6 +39,7 @@ DEFAULT_DATA=APP_PATH + "/data/default_data/"
 CACHE_DIRECTORY=APP_PATH+"/data/cache/"
 FILE_LIST=""
 EXTENSION_DIR=APP_PATH + "/data/extension_sets/"
+ASP_DIR=APP_PATH+'/asp_encoding/'
 
 ZIP_DIRECTORY=APP_PATH + "/data/processed_zip/"
 if not os.path.exists(UPLOAD_DIRECTORY):
@@ -611,7 +612,7 @@ main_page =     html.Div([
                         #{'label': 'Stable and Stage2', 'value': 'stage2_stable'},
                         {'label': 'Stable and CF2', 'value': 'stable_cf2'},
                         #{'label': 'Stage2 and CF2', 'value': 'cf2_stage2'},
-                        {'label':"Semi-Stable and Preferred", 'value':'semi-stable_preferred'},
+                        #{'label':"Semi-Stable and Preferred", 'value':'semi-stable_preferred'},
                         {'label':"Others", 'value':'others'}
                     ],
                     #value=['preferred_stable'],
@@ -909,9 +910,8 @@ def global_individual(eps, minpts, n_cluster, use_optim, semantics):
 
           if len(extensions) == 0:
               extension=process_individual_semantics.process_extension_individual(question, a_semantic, PROCESSED_DIRECTORY, UPLOAD_DIRECTORY,
-                                           EXTENSION_DIR)
-              # extension=process_extension_individual(question, a_semantic, PROCESSED_DIRECTORY, UPLOAD_DIRECTORY,
-              #                              EXTENSION_DIR)
+                                           EXTENSION_DIR, ASP_DIR)
+
 
           else:
               extension = process_individual_semantics.find_semantic_files(extensions, a_semantic)
@@ -982,15 +982,15 @@ def global_store(eps, minpts, n_cluster, use_optim,semantics):
             elif "stable_cf2" in semantics:
                 asp_encoding="cf2_gringo_versus_stable.lp"
                 end="CF2"
-            elif "semi-stable_preferred" in semantics:
-                pass
+            # elif "semi-stable_preferred" in semantics:
+            #     pass
             extension_file="{}.EE_{}".format(question, end)
             #manager = Manager()
             # string = []
             # P = Process(target=compute_extensions, args=(UPLOAD_DIRECTORY +question,asp_encoding,EXTENSION_DIR+extension_file,string))
             #
             # P.start()
-            compute_extension_result=compute_extensions(UPLOAD_DIRECTORY +question,asp_encoding,EXTENSION_DIR+extension_file)
+            compute_extension_result=compute_extensions(UPLOAD_DIRECTORY +question,ASP_DIR+asp_encoding,EXTENSION_DIR+extension_file)
             #print("done\n : string is ",string)
             if compute_extension_result=='oversize': #len(string) >0 and string[0]=='oversize':
                 return 'oversize'
@@ -1209,21 +1209,22 @@ def display_click_data(drop_selection, clickData2, method,n_click):
             selected_point_id=selected_point_info["customdata"]
 
             selected_point=processed_data[processed_data.id==selected_point_id]
-            selected_point_arg=','.join(str(x) for x in selected_point.arg)
-
+            selected_point_arg=list(selected_point.arg.tolist()[0])
+            selected_point_arg=','.join(x for x in selected_point_arg)
+            print("argument set:",selected_point_arg)
             selected_point_cluster=selected_point[cluster_label]
             return html.Div([
                     html.Table([
                         html.Tr([html.Th('Id'),
                                  html.Th('Cluster'),
-                                 html.Th('Groups'),
+                                 html.Th('Semantics Label'),
                                  html.Th('Arguments'),
                                  # html.Th('Most Recent Click')
                                  ]),
                                  html.Tr([html.Td(selected_point_id),
                                           html.Td(selected_point_cluster),
                                           html.Td(selected_point[label]),
-                                          html.Td(selected_point_arg.strip('[]')),
+                                          html.Td(selected_point_arg),
                                           # html.Td(button_id)
                                           ])
                                  ],
