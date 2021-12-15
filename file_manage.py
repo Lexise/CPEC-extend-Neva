@@ -46,3 +46,18 @@ def save_file(name, content, dir):
     #content_type, content_string = content.split(',')
     with open(os.path.join(dir, name), "wb") as fp:
         fp.write(base64.decodebytes(data))
+
+def clean_folder(folder_path):
+    if len(listdir(folder_path))!=0:
+        removed=[]
+        for the_file in listdir(folder_path):
+            file_path = join(folder_path, the_file)
+            try:
+                if isfile(file_path):
+                    unlink(file_path)
+                    removed.append(the_file)
+            except Exception as e:
+                print(e)
+        return removed
+    else:
+        return []

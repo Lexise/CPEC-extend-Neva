@@ -9,22 +9,23 @@ import dash_html_components as html
 import pandas as pd
 import random
 import io
+from process_data import Process_data,get_color_label,get_colors
 from multiprocessing import Process,Manager
 from clingo_asp_compute import compute_extensions
 from sklearn.model_selection import train_test_split
 from zipfile import ZipFile
 from urllib.parse import quote as urlquote
-from file_manage import uploaded_files,get_current_processed_dir_semantic, save_file
+from file_manage import uploaded_files,get_current_processed_dir_semantic, save_file, clean_folder
 from control import WELL_COLOR_new
-import dash_table
+from dash import dash_table
 from ctypes import c_char_p
 import plotly.graph_objects as go
 from flask_caching import Cache
 from flask import Flask, send_from_directory,request
 from clustering_correlation import compute_serial_matrix,innovative_correlation_clustering,my_optimal_leaf_ordering,abs_optimal_leaf_ordering
 import numpy as np
-from process_data import process_data,clean_folder,get_color_label, find_feature_group, process_data_two_sets,\
-    addional_process_individual, process_extension_individual,get_colors,find_semantic_files,get_catogery,initial_process_individual
+# from process_data import process_data,clean_folder,get_color_label, find_feature_group, process_data_two_sets,\
+#     addional_process_individual, process_extension_individual,get_colors,find_semantic_files,get_catogery,initial_process_individual
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 import copy
 from dash.dependencies import Input, Output, State, ClientsideFunction
@@ -457,17 +458,20 @@ main_page =     html.Div([
 
                     html.Div([
                     dcc.Graph(id="3d_scatter_cluster",className="row flex-display",style={'display':'none'}),
-                    html.Br(),
+
                     dcc.Graph(id="3d_scatter_group", className="row flex-display",style={'display':'none'}),
                     ],
 
-                    className="row flex-display"
+                    className="row flex-display",
+                    style={'border-radius': '5px',
+                          'margin': '12px',
+                          'padding': '17px'}
                 ),
 
 
 
-        ], className="flex-display",
-            style={'margin':dict(l=0, r=0, b=0, t=0)}
+        ], className="row flex-display",
+           # style={'margin':dict(l=10, r=0, b=0, t=0)}
         # parent_style={'flex-direction': 'column',
         #                            '-webkit-flex-direction': 'column',
         #                            '-ms-flex-direction': 'column',
@@ -900,26 +904,30 @@ def global_individual(eps, minpts, n_cluster, use_optim, semantics):
     try:
        print('cleaned:', clean_folder(PROCESSED_DIRECTORY))
        temp_para=[]
+       process_individual_semantics = Process_data("start")
        for a_semantic in semantics:
 
           if len(extensions) == 0:
-              extension=process_extension_individual(question, a_semantic, PROCESSED_DIRECTORY, UPLOAD_DIRECTORY,
+              extension=process_individual_semantics.process_extension_individual(question, a_semantic, PROCESSED_DIRECTORY, UPLOAD_DIRECTORY,
                                            EXTENSION_DIR)
-              #transfered,arguments, itemlist=initial_process_individual(PROCESSED_DIRECTORY, UPLOAD_DIRECTORY + question, EXTENSION_DIR + extension, a_semantic)
+              # extension=process_extension_individual(question, a_semantic, PROCESSED_DIRECTORY, UPLOAD_DIRECTORY,
+              #                              EXTENSION_DIR)
 
           else:
-              extension = find_semantic_files(extensions, a_semantic)
-          transfered, arguments, itemlist = initial_process_individual(PROCESSED_DIRECTORY,
+              extension = process_individual_semantics.find_semantic_files(extensions, a_semantic)
+
+          transfered, arguments, itemlist = process_individual_semantics.initial_process_individual(PROCESSED_DIRECTORY,
                                                                            UPLOAD_DIRECTORY + question,
                                                                            EXTENSION_DIR + extension, a_semantic)
           temp_para.append({'semantic':a_semantic,'transfered':transfered,'arguments':arguments,'itemlist':itemlist})
 
-       get_catogery(PROCESSED_DIRECTORY, semantics)
+       process_individual_semantics.get_catogery(PROCESSED_DIRECTORY, semantics)
        for item in temp_para:
-            process_data_two_sets(PROCESSED_DIRECTORY, UPLOAD_DIRECTORY + question, item['transfered'], item['arguments'], item['itemlist'], eps,
+            process_individual_semantics.process_data_two_sets(PROCESSED_DIRECTORY, UPLOAD_DIRECTORY + question, item['transfered'], item['arguments'], item['itemlist'], eps,
                              minpts,
                              n_cluster, use_optim, item['semantic'])
-       addional_process_individual(PROCESSED_DIRECTORY,semantics)
+       process_individual_semantics.addional_process_individual(PROCESSED_DIRECTORY,semantics)
+       print("whole process time consuming: ", time.process_time() - start_time0)
     except Exception as e:
         print('error:',e)
         return html.Div([
@@ -1000,8 +1008,8 @@ def global_store(eps, minpts, n_cluster, use_optim,semantics):
         print("finish extensions computing:", time.process_time() - start_time0)
         start_time = time.process_time()#time.time()
         print("start process")
-
-        result=process_data(PROCESSED_DIRECTORY,UPLOAD_DIRECTORY+question, extension_dir+extension_file,eps, minpts, n_cluster,use_optim,semantics)
+        process_pair_semantics=Process_data('start')
+        result=process_pair_semantics.process_data(PROCESSED_DIRECTORY,UPLOAD_DIRECTORY+question, extension_dir+extension_file,eps, minpts, n_cluster,use_optim,semantics)
         if not result:
             return html.Div([
                 'no extensions exist for the selected semantics'
@@ -1358,7 +1366,7 @@ def generate_tabs1( content, reduction1,  method, n_click,semantic, present_sema
 def generate_tabs(content, selected_visual, semantic, reduction2, cluster_method, n_click):
             if selected_visual=='dropdown-2d':
                 fig=generate_tabs2(content,reduction2, cluster_method, n_click)
-                return fig,{'display':'block'},{},{},{'display':'none','marginLeft':'20px','marginRight':'20px'},{'display':'none'},{'display':'none'},{'display':'flex','position': 'relative' }
+                return fig,{'display':'block'},{},{},{'display':'none'},{'display':'none'},{'display':'none'},{'display':'flex','position': 'relative' }
             elif selected_visual=='dropdown-3d':
                 fig1,fig2=display3d(reduction2, semantic, cluster_method)
                 return {},{'display':'none'},fig1,fig2,{'display':'block'},{'display':'block'},{'display':'none'},{'display':'flex','position': 'relative' }
@@ -1631,7 +1639,7 @@ def make_bar_figure(present_data, valuelist,sort_state):
 
 
 def set_bar_figure(argument_data, valuelist):
-    layout_count = copy.deepcopy(layout)
+
     select_idx=range(valuelist[0],valuelist[1])
     selected=argument_data.iloc[select_idx]
     selected["order"]=range(len(selected))
@@ -1645,14 +1653,15 @@ def set_bar_figure(argument_data, valuelist):
             name="All Wells"
         )]
 
+    layout_count={}
 
     layout_count["title"] = "Rate/Argument"
 
     layout_count["dragmode"] = "select"
     layout_count["showlegend"] = False
     layout_count["autosize"] = True,
-    layout_count["titlefont"] = {"size": 28}
-    layout_count["marker"] = {"fontsize": 20}
+    layout_count["titlefont"] = {"size": 25}
+    layout_count["marker"] = {"fontsize": 10}
     if 'xaxis' in layout_count:
         del layout_count['xaxis']
         del layout_count['yaxis']
@@ -1789,7 +1798,7 @@ def update_cluster_rate(clickData, cluster_method):
             process_data = processed_data = pd.read_pickle(DEFAULT_DATA + 'processed_data.pkl')
 
     mini_block=[]
-    layout_pie = copy.deepcopy(layout)
+    layout_pie={}
     layout_pie["title"] = "Cluster Summary"
     if clickData is None:
         return "Selected Argument: None",mini_block,dict(data=None, layout=layout_pie),
@@ -1894,7 +1903,7 @@ def update_cluster_rate(clickData, cluster_method):
             )
         ]
 
-    layout_pie["title"] = "Cluster Summary"
+
     layout_pie["legend"] = dict(
         font=dict(color="#CCCCCC", size="10"), orientation="h", bgcolor="rgba(0,0,0,0)"
     )
@@ -1925,14 +1934,13 @@ def update_graph(clickData, dimensional_reduction, cluster_method):
             process_data = pd.read_pickle(DEFAULT_DATA + "processed_data.pkl")
 
 
-    layout_scatter = copy.deepcopy(layout)
-    layout_scatter["title"]="Distribution of Selected Argument"
-    layout_scatter["clickmode"]= 'event+select'
+    layout_scatter ={"title":"Distribution of Selected Argument",
+                       "clickmode":'event+select'
+                       }
+
+
     if clickData is None:
-        return {
-            'data':[],
-            'layout': layout_scatter
-        }
+        return {"layout":layout_scatter}
     temp=clickData["points"][0]
     cluster_label=cluster_method +"_cluster_label"
     arguments=re.search(r'\d+', temp["x"]).group()#int()
