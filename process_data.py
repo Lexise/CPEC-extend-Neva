@@ -146,7 +146,7 @@ class Process_data:
         feature2 = self.find_feature_group(common_all, processed_data_cf2, processed_data_stage2)
         sum_diff = pd.DataFrame({
             "semantics": [semantic1, semantic2],
-            "feature_arguments": [feature1, feature2],
+            "identifier": [feature1, feature2],
         })
         sum_diff.to_pickle(processed_dir + "group_feature.pkl")
         common_data = pd.merge(processed_data_cf2, processed_data_stage2, on=['arg'], how='inner')

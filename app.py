@@ -59,7 +59,6 @@ if not os.path.exists(ZIP_DIRECTORY):
 # p = os.popen('ls -la')
 # print(p.read())
 
-
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP],meta_tags=[{"name": "viewport", "content": "width=device-width"}])
 app.scripts.config.serve_locally=True
 app.css.config.serve_locally=True
@@ -446,9 +445,7 @@ main_page =     html.Div([
 
 
     html.Div([
-
-
-                html.Div([
+                    html.Div([
                     dcc.Graph(
                         id="scatter_groups",style={'display':'none'})
                     ],
@@ -531,7 +528,7 @@ main_page =     html.Div([
                 style={'marginLeft': '2%', 'width': '18%'},
             ),
 
-            html.Button(id='feature_semantic', children='semantics feature',className='middle-button',
+            html.Button(id='feature_semantic', children='semantics identifier',className='middle-button',
                         style={'marginTop':'0.5%','font-size': '14px', "color": "#000000", "backgroundColor": "#f0f0f0"}),
             dbc.Tooltip(
 
@@ -539,7 +536,7 @@ main_page =     html.Div([
                 target="feature_semantic",
                 style ={'font-size': '11px',"color": "#000000", "backgroundColor": "#f0f0f0"}
             ),
-            html.Button(id='feature_cluster', children='clusters feature',className='middle-button',
+            html.Button(id='feature_cluster', children='clusters identifier',className='middle-button',
                         style={'marginTop':'0.5%','font-size': '14px','marginLeft': '3%', "color": "#000000", "backgroundColor": "#f0f0f0"}),#'marginTop':'1%',
 
             dbc.Tooltip(
@@ -667,8 +664,21 @@ main_page =     html.Div([
                         options=[{"label": "use suggested parameters", "value": "use_bo"}],
                         className="dcc_control",
                         value=[],
-                        style={'height': '40px', 'marginLeft': '1.5%'}
+                        style={'height': '50px', 'marginLeft': '1.5%'}
                     ),
+                    # html.Abbr("\u003F", title="Hello, I am hover-enabled helpful information.")
+                    html.Span(
+                        "?",
+                        id="tooltip-target",
+                        style={
+                            "textAlign": "center",
+                            "color": "white"
+                        },
+                        className="dot"),
+
+                    dbc.Tooltip(
+                        "use Bayesian Optimization to find suitable clustering parameters (Eps, MinPts, Cluster Num)",
+                        target="tooltip-target",)
                         ],
                 className="row flex-display"
                 ),
@@ -1423,7 +1433,7 @@ def generate_tabs2(content, reduction2, method, n_click):  # method):
 
     fig = go.Figure()
 
-    # add points (groups)
+    # add shape (groups)
     groups_set = np.sort(processed_data[color_label].unique())
     get_color_label(processed_data, color_label, groups_set)
 
@@ -1436,10 +1446,10 @@ def generate_tabs2(content, reduction2, method, n_click):  # method):
             name=str(x),
             hoverinfo="none",
             marker=dict(
-                size=15,
+                size=14,
                 color=processed_data[processed_data[color_label] == x]['color'],
                 # colorscale='Viridis',
-                #opacity=0.15
+                # opacity=0.8
             ),
             # marker=dict(
             #     color=processed_data[processed_data[color_label] == x]['color'],
@@ -1448,9 +1458,9 @@ def generate_tabs2(content, reduction2, method, n_click):  # method):
             showlegend=True
         ))
 
-    # Add shapes
+    # Add points
     cluster_label = method + "_cluster_label"
-    processed_data[cluster_label] = ["Cluster " + str(a) for a in processed_data[cluster_label]]
+    #processed_data[cluster_label] = ["Cluster " + str(a) for a in processed_data[cluster_label]]
     cluster_set = list(processed_data[cluster_label].unique())
 #    colors=get_colors(len(cluster_set))#['blue','red','green','yellow']
     num_color=len(cluster_set)
@@ -1458,47 +1468,72 @@ def generate_tabs2(content, reduction2, method, n_click):  # method):
         colors=get_colors(len(cluster_set))#['rgb'+str(x) for x in sns.color_palette(n_colors=len(cluster_set))]
     else:
         colors=[WELL_COLOR_new[i] for i in range(num_color)]
-    for clabel in cluster_set:
-        select=processed_data[processed_data[cluster_label] == clabel]
-        x_list = select[x_axe]
-        y_list = select[y_axe]
-        # fig.add_shape(type="circle",
-        #               xref="x", yref="y",
-        #               x0=x_list.min(), y0=y_list.min(),
-        #               x1=x_list.max(), y1=y_list.max(),
-        #               opacity=0.3,
-        #               layer="below",
-        #               fillcolor=colors[cluster_set.index(clabel)],
-        #               line_color=colors[cluster_set.index(clabel)],
-        #               name='cluster'+str(clabel)
-        #               )
+    # for clabel in cluster_set:
+    #     select=processed_data[processed_data[cluster_label] == clabel]
+    #     x_list = select[x_axe]
+    #     y_list = select[y_axe]
+    #     # fig.add_shape(type="circle",
+    #     #               xref="x", yref="y",
+    #     #               x0=x_list.min(), y0=y_list.min(),
+    #     #               x1=x_list.max(), y1=y_list.max(),
+    #     #               opacity=0.3,
+    #     #               layer="below",
+    #     #               fillcolor=colors[cluster_set.index(clabel)],
+    #     #               line_color=colors[cluster_set.index(clabel)],
+    #     #               name='cluster'+str(clabel)
+    #     #               )
+    data=processed_data
+    for cls in cluster_set:
         fig.add_trace(
             go.Scatter(
-                x=x_list,
-                y=y_list,
-                #fill="toself",
-                mode='markers',
+                x=data[data[cluster_label] == cls][x_axe],
+                y=data[data[cluster_label] == cls][y_axe],
+                #z=[len(set(s)) for s in data[data[cluster_label] == cls]["arg"]],
+                customdata=data[data[cluster_label]==cls]['id'],
 
-                # marker=dict(
-                #                   size=15,
-                #                   color=colors[cluster_set.index(clabel)],
-                #     #colorscale='Viridis',
-                #     opacity=0.06
-                # ),
+                text=data[data[cluster_label] == cls].id,
+                # text=["cluster: {}".format(x) for x in data[data[cluster_label]==cls][cluster_label]],
+                mode='markers',
+                name="cluster" + str(cls + 1),
                 marker=dict(
-                    #size=4,
-                    color=colors[cluster_set.index(clabel)],
+
+                    color=cls,  # set color to an array/list of desired values
+                    colorscale='Viridis',  # choose a colorscale
+                    opacity=0.8,
 
                 ),
-                customdata=select["id"],
-                name=clabel,
-                line_color=colors[cluster_set.index(clabel)],
-                #text=clabel,
-
-            )
-        )
+            ))
 
 
+
+        # go.Scatter(
+        #     x=x_list,
+        #     y=y_list,
+        #     #fill="toself",
+        #     mode='markers',
+        #
+        #     # marker=dict(
+        #     #                   size=15,
+        #     #                   color=colors[cluster_set.index(clabel)],
+        #     #     #colorscale='Viridis',
+        #     #     opacity=0.06
+        #     # ),
+        #     marker=dict(
+        #         #size=4,
+        #         #color=colors[cluster_set.index(clabel)],
+        #         #
+        #         colorscale='Viridis',
+        #         opacity=0.8
+        #     ),
+        #     customdata=select["id"],
+        #     name=clabel,
+        #     #line_color=colors[cluster_set.index(clabel)],
+        #     #text=clabel,
+        #
+        # )
+
+
+    #fig.layout.plot_bgcolor = '#386cb0'
 
     fig.update_layout(xaxis={'showgrid': False, 'visible': False, },
                       yaxis={'showgrid': False, 'visible': False, },
@@ -2117,7 +2152,7 @@ def display3d( reduction_method, semantics,cluster_method):
         hovertemplate='Id:%{text}</b><br>length:%{z} <br></b>Arguments:%{customdata} ',
         text=data[data[group_label] == cls].id,
         mode='markers',
-        name=group_label + str(cls),
+        name= str(cls),
         marker=dict(
             size=3,
             #color=cls,  # set color to an array/list of desired values
@@ -2153,7 +2188,7 @@ def display3d( reduction_method, semantics,cluster_method):
               [Input('btn-nclicks-1', 'n_clicks'),Input('btn-nclicks-2', 'n_clicks'),Input('btn-nclicks-3', 'n_clicks'),Input('btn-nclicks-4', 'n_clicks')])
 def displayClick(btn1, btn2 , btn3, btn4):
 
-    if os.listdir(PROCESSED_DIRECTORY):  # load and processed
+    if  len(os.listdir(PROCESSED_DIRECTORY)) == 6:  # load and processed
 
             data_correlation = pd.read_pickle(PROCESSED_DIRECTORY + "correlation_matrix.pkl")
             processed_data=pd.read_pickle(PROCESSED_DIRECTORY + "processed_data.pkl")
@@ -2283,13 +2318,13 @@ def get_feature_table(content,   cluster_method,
 
         # table
     if len(group_table) == 0:
-        table1 = "No Semantics Feature"
+        table1 = "No Semantics Didentifier"
     else:
         table1=dbc.Table.from_dataframe(group_table, striped=True, bordered=True, hover=True)
 
 
     if len(cluster_table) == 0:
-        table2 = "No Cluster feature"
+        table2 = "No Cluster Didentifier"
     else:
         table2=dbc.Table.from_dataframe(cluster_table, striped=True, bordered=True, hover=True)
 
