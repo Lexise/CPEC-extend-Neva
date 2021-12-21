@@ -211,7 +211,7 @@ argument_analysis=html.Div([
                     # ),
 
 
-                    html.P("Presented data:", style={"font-weight": "bold"},className="control_label"),
+                    html.P("Presented data:", style={"fontWeight": "bold"},className="control_label"),
                     dcc.RadioItems(
                         id="data_present_selector",
                         options=[
@@ -231,7 +231,7 @@ argument_analysis=html.Div([
                     ),
 
 
-                    html.P("Cluster Algorithm:", style={"font-weight": "bold"}, className="control_label"),
+                    html.P("Cluster Algorithm:", style={"fontWeight": "bold"}, className="control_label"),
                     dcc.RadioItems(
                         id="clustering-method",
                         options=[
@@ -362,54 +362,53 @@ argument_analysis=html.Div([
 
     #     className="row flex-display",
     # ),
-],
+    ],
 
 )
 
 correlation_page= html.Div([
-                dcc.Link(html.Button('back'), href='/'),
-                html.Div([
+    dcc.Link(html.Button('back'), href='/'),
+    html.Div([
 
-                dcc.Graph(
-                    id="correlation_hm"
-                   ),
+    dcc.Graph(
+        id="correlation_hm"
+        ),
+    html.Div([
+        html.Button('HRP',
+                    style={'fontSize': '14px','marginLeft': '2%', 'marginRight': '2%',"color": "#FFFF", "backgroundColor": "#2F8FD2"},
+                    id='btn-nclicks-1', n_clicks=0),
+        html.Button('Revised HRP',
+                    style={'fontSize': '14px', 'marginRight': '2%',"color": "#FFFF", "backgroundColor": "#2F8FD2"},
+                    id='btn-nclicks-2', n_clicks=0),
+        html.Button('OLO',
+                    style={'fontSize': '14px', 'marginRight': '2%',"color": "#FFFF", "backgroundColor": "#2F8FD2"},
+                    id='btn-nclicks-3', n_clicks=0),
+        html.Button('Revised OLO',
+                    style={'fontSize': '14px', 'marginRight': '2%',"color": "#FFFF", "backgroundColor": "#2F8FD2"},
+                    id='btn-nclicks-4', n_clicks=0),
+        # html.P("Presented semantic extension:", style={"fontWeight": "bold"}, className="dcc_control"),
+        #
+        # dcc.RadioItems(
+        #     id="data_semantic_correlation",
+        #     loading_state={"is_loading":True},
+        #     options=[
+        #         {"label": "Preferred ", "value": "pr"},
+        #         {"label": "Stage", "value": "stg"},
+        #     ],
+        #     value="pr",
+        #     labelStyle={"display": "inline-block"},
+        #     className="dcc_control",
+        # ),
+        ],
+        className="row flex-display"
+    )
 
-#html.Button('Correlation Matrix',style={'marginLeft': '2%', 'width': '49%','font-size':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}),
-                html.Div([
-                    html.Button('HRP',
-                                style={'font-size': '14px','marginLeft': '2%', 'marginRight': '2%',"color": "#FFFF", "backgroundColor": "#2F8FD2"},
-                                id='btn-nclicks-1', n_clicks=0),
-                    html.Button('Revised HRP',
-                                style={'font-size': '14px', 'marginRight': '2%',"color": "#FFFF", "backgroundColor": "#2F8FD2"},
-                                id='btn-nclicks-2', n_clicks=0),
-                    html.Button('OLO',
-                                style={'font-size': '14px', 'marginRight': '2%',"color": "#FFFF", "backgroundColor": "#2F8FD2"},
-                                id='btn-nclicks-3', n_clicks=0),
-                    html.Button('Revised OLO',
-                                style={'font-size': '14px', 'marginRight': '2%',"color": "#FFFF", "backgroundColor": "#2F8FD2"},
-                                id='btn-nclicks-4', n_clicks=0),
-                    # html.P("Presented semantic extension:", style={"font-weight": "bold"}, className="dcc_control"),
-                    #
-                    # dcc.RadioItems(
-                    #     id="data_semantic_correlation",
-                    #     loading_state={"is_loading":True},
-                    #     options=[
-                    #         {"label": "Preferred ", "value": "pr"},
-                    #         {"label": "Stage", "value": "stg"},
-                    #     ],
-                    #     value="pr",
-                    #     labelStyle={"display": "inline-block"},
-                    #     className="dcc_control",
-                    # ),
-                    ],
-                className="row flex-display"
-                )
+    ],
+    className="pretty_container")
+    ]
+)
 
-                ],
-            className="pretty_container")
-    ])
-
-main_page =     html.Div([
+main_page = html.Div([
 
 
         # empty Div to trigger javascript file for graph resizing
@@ -424,17 +423,17 @@ main_page =     html.Div([
 
             ],
             value='upload-user',
-            style={'font-size': '14px', 'width': '150px','marginLeft': '2%'}
+            style={'fontSize': '14px', 'width': '150px','marginLeft': '2%'}
         ),
 
         #html.Br(),
         dcc.Link(html.Button('Argument Analysis',
-                             style={'marginLeft': '4%','marginRight': '8px','width': '300px', 'font-size': '14px', "color": "#FFFF", "backgroundColor": "#2F8FD2"}),
+                             style={'marginLeft': '4%','marginRight': '8px','width': '300px', 'fontSize': '14px', "color": "#FFFF", "backgroundColor": "#2F8FD2"}),
                  href='/page-argument'),
 
-        # dcc.Link(html.Button('3D Analysis',style={'marginLeft': '2%','width': '32%','font-size':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-3d'),
+        # dcc.Link(html.Button('3D Analysis',style={'marginLeft': '2%','width': '32%','fontSize':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-3d'),
         dcc.Link(html.Button('Correlation Matrix',
-                             style={'marginLeft': '4%', 'width': '300px', 'font-size': '14px', "color": "#FFFF",
+                             style={'marginLeft': '4%', 'width': '300px', 'fontSize': '14px', "color": "#FFFF",
                                     "backgroundColor": "#2F8FD2"}), href='/page-correlation'),
     #html.Hr(),
     ],
@@ -482,7 +481,7 @@ main_page =     html.Div([
 
         html.Div([
             html.Div([
-                html.Span("Semantics:", style={"margin-top": "5%","font-weight": "bold"}),
+                html.Span("Semantics:", style={"marginTop": "5%","fontWeight": "bold"}),
                 dcc.RadioItems(
                     id="semantic-method-1",
                     options=[
@@ -496,7 +495,7 @@ main_page =     html.Div([
                 style={'marginLeft': '2%', 'width': '18%'},
             ),
             html.Div(children=[
-                html.Span("Dimensional Reduction:", style={"font-weight": "bold"}),
+                html.Span("Dimensional Reduction:", style={"fontWeight": "bold"}),
                 dcc.RadioItems(
                     id="dimensional-reduction1",
                     options=[
@@ -514,7 +513,7 @@ main_page =     html.Div([
 
             html.Div(
                      [
-                html.Span("Cluster Algorithm:", style={"font-weight": "bold"}),
+                html.Span("Cluster Algorithm:", style={"fontWeight": "bold"}),
                 dcc.RadioItems(
                     id="clustering-method",
                     options=[
@@ -529,20 +528,20 @@ main_page =     html.Div([
             ),
 
             html.Button(id='feature_semantic', children='semantics identifier',className='middle-button',
-                        style={'marginTop':'0.5%','font-size': '14px', "color": "#000000", "backgroundColor": "#f0f0f0"}),
+                        style={'marginTop':'0.5%','fontSize': '14px', "color": "#000000", "backgroundColor": "#f0f0f0"}),
             dbc.Tooltip(
 
                 id='feature_semantic_table',
                 target="feature_semantic",
-                style ={'font-size': '11px',"color": "#000000", "backgroundColor": "#f0f0f0"}
+                style ={'fontSize': '11px',"color": "#000000", "backgroundColor": "#f0f0f0"}
             ),
             html.Button(id='feature_cluster', children='clusters identifier',className='middle-button',
-                        style={'marginTop':'0.5%','font-size': '14px','marginLeft': '3%', "color": "#000000", "backgroundColor": "#f0f0f0"}),#'marginTop':'1%',
+                        style={'marginTop':'0.5%','fontSize': '14px','marginLeft': '3%', "color": "#000000", "backgroundColor": "#f0f0f0"}),#'marginTop':'1%',
 
             dbc.Tooltip(
                 id='feature_cluster_table',
                 target="feature_cluster",
-                style={'font-size': '11px', "color": "#000000", "backgroundColor": "#f0f0f0"}
+                style={'fontSize': '11px', "color": "#000000", "backgroundColor": "#f0f0f0"}
             ),
 
 
@@ -556,30 +555,30 @@ main_page =     html.Div([
         html.Div(id='hover-data'),
 
         # html.Br(),
-        # dcc.Link(html.Button('Argument Analysis',style={'width': '32%','font-size':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-argument'),
-        # #dcc.Link(html.Button('3D Analysis',style={'marginLeft': '2%','width': '32%','font-size':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-3d'),
-        # dcc.Link(html.Button('Correlation Matrix',style={'marginLeft': '2%', 'width': '32%','font-size':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-correlation'),
+        # dcc.Link(html.Button('Argument Analysis',style={'width': '32%','fontSize':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-argument'),
+        # #dcc.Link(html.Button('3D Analysis',style={'marginLeft': '2%','width': '32%','fontSize':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-3d'),
+        # dcc.Link(html.Button('Correlation Matrix',style={'marginLeft': '2%', 'width': '32%','fontSize':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-correlation'),
         # html.Hr(),
         html.Div([
         dcc.Tabs([
-#html.Br(),
+
             dcc.Tab(label='UPLOAD', children=[
                 html.Div(
                     [
                     html.Div([
                         dcc.Upload([html.Button(children='UPLOAD APX', id="upload_button")], id="upload-data",
-                                   style={'width': '13%', 'marginLeft': '16%', 'marginTop': '1%', 'font-size': '15px',
-                                          'font-weight': 'bold', "color": "#FFFF",'marginRight': '10%'}, multiple=True),
+                                   style={'width': '13%', 'marginLeft': '16%', 'marginTop': '1%', 'fontSize': '15px',
+                                          'fontWeight': 'bold', "color": "#FFFF",'marginRight': '10%'}, multiple=True),
                         dcc.Upload([html.Button(children='UPLOAD Extensions', id="upload_ex_button")], id="upload-ex-data",
-                                   style={'width': '13%', 'marginLeft': '15%', 'marginTop': '1%', 'font-size': '15px',
-                                          'font-weight': 'bold', "color": "#FFFF"}, multiple=True),
+                                   style={'width': '13%', 'marginLeft': '15%', 'marginTop': '1%', 'fontSize': '15px',
+                                          'fontWeight': 'bold', "color": "#FFFF"}, multiple=True),
                     ],
                     className = "row flex-display"),
                     html.Div([
 
 
                         html.Div([html.P("Uploaded",className="dcc_control",style={"width":"80%",'textAlign': 'left'}),
-                        html.Button(id='clear-upload', n_clicks=0, children='Clear',style={'font-size':'11px','textAlign': 'left','marginRight': '1%'}),
+                        html.Button(id='clear-upload', n_clicks=0, children='Clear',style={'fontSize':'11px','textAlign': 'left','marginRight': '1%'}),
                         ],
                         className = "row flex-display"   ),
 
@@ -598,7 +597,7 @@ main_page =     html.Div([
                 html.Div([
                     html.Div(
                         [
-                    html.Span("Semantics:", style={"font-weight": "bold",'marginRight': '1%','marginLeft': '0.5%'}),
+                    html.Span("Semantics:", style={"fontWeight": "bold",'marginRight': '1%','marginLeft': '0.5%'}),
 
 
                     dcc.Dropdown(
@@ -689,10 +688,10 @@ main_page =     html.Div([
                 dcc.Store(id="store-prev-comparisons"),
                 html.Br(),
                 html.Div([
-                    html.P("Eps:", style={"font-weight": "bold"}, className="dcc_control"),
+                    html.P("Eps:", style={"fontWeight": "bold"}, className="dcc_control"),
                     dcc.Input(id='eps', type="number", placeholder="input eps",disabled=False, style={'width': '22%','marginRight': '4%'}),
                     dbc.Tooltip("DBscan  parameter, specifies the distance between two points to be considered within one cluster.suggested a decimal in range[1,3]", target="eps"),
-                    html.P("MinPts:", style={"font-weight": "bold"}, className="dcc_control"),
+                    html.P("MinPts:", style={"fontWeight": "bold"}, className="dcc_control"),
                     dcc.Input(id='minpts',  type="number", placeholder="input minpts",disabled=False,style={'width': '22%'}),#style={'width': '10%','marginRight': '0.5%'}
                     dbc.Tooltip("DBscan parameter, the minimum number of points to form a cluster. suggested an integer in range[3,15]", target="minpts"),
                 ],
@@ -700,15 +699,15 @@ main_page =     html.Div([
                 className="row flex-display"),
                 html.Br(),
                 html.Div([
-                    html.P("Cluster Num", style={"font-weight": "bold"}, className="dcc_control"),
+                    html.P("Cluster Num", style={"fontWeight": "bold"}, className="dcc_control"),
                     dcc.Input(id='cluster_num', type="number", placeholder="input cluster num",disabled=False),
                     dbc.Tooltip("Kmeans parameter, number of clusters, suggested an integer in range[2,15]", target="cluster_num"),
                 ],
                 className="row flex-display"),
-                html.Button(id='submit-button-state', n_clicks=0, children='Submit',className="middle-button",style={'font-size':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"})],
+                html.Button(id='submit-button-state', n_clicks=0, children='Submit',className="middle-button",style={'fontSize':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"})],
                     className="empty_container five columns",
 
-                #className="pretty_container five columns",) style={'width': '32%','font-size':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}
+                #className="pretty_container five columns",) style={'width': '32%','fontSize':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}
                 )
             ],
             className="row flex-display"
@@ -791,7 +790,7 @@ main_page =     html.Div([
         #
         #         html.Div([
         #             html.P("Upload",className="dcc_control",style={"width":"91%",'textAlign': 'left'}),
-        #             html.Button(id='clear-upload', n_clicks=0, children='Clear',style={'width': '12%','font-size':'11px','textAlign': 'right'}),
+        #             html.Button(id='clear-upload', n_clicks=0, children='Clear',style={'width': '12%','fontSize':'11px','textAlign': 'right'}),
         #
         #         ],
         #             className="row flex-display",
@@ -815,59 +814,53 @@ main_page =     html.Div([
     #style={'height': '100%'}
 )
 
+ThreeD_analysis = html.Div([
+    dcc.Link(html.Button('back'), href='/'),
+    # html.Div([
+    #     dcc.Graph(id="3d_scatter_cluster",className="row flex-display"),
+    #     dcc.Graph(id="3d_scatter_group", className="row flex-display"),
+    #     ],
+    #     className="row flex-display"
+    # ),
+    html.Div([
 
-
-
-
-
-
-ThreeD_analysis=html.Div([
-                dcc.Link(html.Button('back'), href='/'),
-                # html.Div([
-                #     dcc.Graph(id="3d_scatter_cluster",className="row flex-display"),
-                #     dcc.Graph(id="3d_scatter_group", className="row flex-display"),
-                #     ],
-                #     className="row flex-display"
-                # ),
-                    html.Div([
-
-                        html.Div([
-                                    html.P("Dimensional Reduction Method:", style={"font-weight": "bold"},className="dcc_control"),
-                                    dcc.RadioItems(
-                                        id="reduction_method",
-                                        options=[
-                                            {"label": "Tsne ", "value": "tsne"},
-                                            {"label": "SVD", "value": "svd"},
-                                            {"label": "AutoEncode", "value": "auto"},
-                                        ],
-                                        labelStyle={"display": "inline-block"},
-                                        value="tsne",
-                                        className="dcc_control",
-                                )],
-                                style={'marginRight': '2%', 'width': '30%'},
-                                className="row flex-display"
-                        ),
-                        html.Div([
-                                    html.P("Cluster Algorithm:", style={"font-weight": "bold"}, className="dcc_control"),
-                                    dcc.RadioItems(
-                                        id="clustering-method",
-                                        options=[
-                                            {"label": "DBscan ", "value": "db"},
-                                            {"label": "Kmeans", "value": "km"},
-                                        ],
-                                        labelStyle={"display": "inline-block"},
-                                        value="db",
-                                        className="dcc_control",
-                                    )],
-
-                            style={ 'width': '30%'},
-                            className="row flex-display"
-                            )
-
+        html.Div([
+                    html.P("Dimensional Reduction Method:", style={"fontWeight": "bold"},className="dcc_control"),
+                    dcc.RadioItems(
+                        id="reduction_method",
+                        options=[
+                            {"label": "Tsne ", "value": "tsne"},
+                            {"label": "SVD", "value": "svd"},
+                            {"label": "AutoEncode", "value": "auto"},
                         ],
-                        className = "row flex-display"),
-                    ],
-                )
+                        labelStyle={"display": "inline-block"},
+                        value="tsne",
+                        className="dcc_control",
+                )],
+                style={'marginRight': '2%', 'width': '30%'},
+                className="row flex-display"
+        ),
+        html.Div([
+                    html.P("Cluster Algorithm:", style={"fontWeight": "bold"}, className="dcc_control"),
+                    dcc.RadioItems(
+                        id="clustering-method",
+                        options=[
+                            {"label": "DBscan ", "value": "db"},
+                            {"label": "Kmeans", "value": "km"},
+                        ],
+                        labelStyle={"display": "inline-block"},
+                        value="db",
+                        className="dcc_control",
+                    )],
+
+            style={ 'width': '30%'},
+            className="row flex-display"
+            )
+
+        ],
+        className = "row flex-display"),
+    ],
+)
 
 app.layout = html.Div([
 
@@ -882,7 +875,7 @@ app.layout = html.Div([
         children=html.Div(id="signal")
     ),
 
-],
+    ],
     #className='my_main_container',
      style={'height':'100vh', 'margin':dict(l=0, r=0, b=0, t=0)}
     #style={"display": "flex", "flex-direction": "column"},
@@ -1223,24 +1216,26 @@ def display_click_data(drop_selection, clickData2, method,n_click):
             selected_point_arg=','.join(x for x in selected_point_arg)
             print("argument set:",selected_point_arg)
             selected_point_cluster=selected_point[cluster_label]
-            return html.Div([
-                    html.Table([
-                        html.Tr([html.Th('Id'),
-                                 html.Th('Cluster'),
-                                 html.Th('Semantics Label'),
-                                 html.Th('Arguments'),
-                                 # html.Th('Most Recent Click')
-                                 ]),
-                                 html.Tr([html.Td(selected_point_id),
-                                          html.Td(selected_point_cluster),
-                                          html.Td(selected_point[label]),
-                                          html.Td(selected_point_arg),
-                                          # html.Td(button_id)
-                                          ])
-                                 ],
-                    )
-                    ],
-            className = "pretty_container")
+            return html.Div([ 
+                html.Table([
+                    html.Tbody([
+                        html.Tr([
+                            html.Th('Id'),
+                            html.Th('Cluster'),
+                            html.Th('Semantics Label'),
+                            html.Th('Arguments'),
+                            # html.Th('Most Recent Click')
+                        ]),
+                        html.Tr([
+                            html.Td(selected_point_id),
+                            html.Td(selected_point_cluster),
+                            html.Td(selected_point[label]),
+                            html.Td(selected_point_arg),
+                            # html.Td(button_id)
+                            ])
+                    ])
+                ])
+            ], className = "pretty_container")
     return None
 
 
@@ -1350,7 +1345,7 @@ def generate_tabs1( content, reduction1,  method, n_click,semantic, present_sema
         raise dash.exceptions.PreventUpdate
         #return dash.no_update
     # radio_item=[
-    #             html.Span("Semantics:", style={"margin-top": "5%","font-weight": "bold"}),
+    #             html.Span("Semantics:", style={"marginTop": "5%","fontWeight": "bold"}),
     #             dcc.RadioItems(
     #                 id="semantic-method-1",
     #                 options=[
@@ -1682,7 +1677,7 @@ def set_bar_figure(argument_data, valuelist):
 
     data = [dict(
             type="bar",
-            x=list(selected["argument"]),
+            x=list([ x.replace('argument', '') for x in selected["argument"] ]),
             y=list(selected["rate"]),
             hovertext={"fontsize":20},
             #hovertext=["attribute:{arg},rate:{percent}".format(arg=row.attribute,percent=row.rate) for index,row in selected.iterrows()],
