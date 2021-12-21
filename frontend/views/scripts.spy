@@ -1,0 +1,11 @@
+<script src="//d3js.org/d3.v5.min.js"></script>
+<script src="//d3js.org/d3-selection-multi.v1.js"></script>
+<script src="//d3js.org/d3-dsv.v1.min.js"></script>
+<script src="//cdn.jsdelivr.net/g/filesaver.js"></script>
+
+<script src="/lib/materialize/js/materialize.min.js"></script>
+<script src="/lib/svg-pan-zoom-3.6.1/dist/svg-pan-zoom.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+
+<script src="/js/controls.js"></script>
+<script src="/js/session-id.js"></script>

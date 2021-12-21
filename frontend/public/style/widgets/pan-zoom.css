@@ -1,0 +1,26 @@
+:root {
+    --pan-zoom-control-spacing-x: 120px;
+    --pan-zoom-control-spacing-y: 100px;
+}
+
+#svg-pan-zoom-controls {
+    transform: translate(
+            calc(100% - var(--pan-zoom-control-spacing-x)),
+            calc(100vh - var(--pan-zoom-control-spacing-y))
+        )
+        scale(0.75);
+}
+
+.svg-pan-zoom-control {
+    cursor: pointer;
+    fill: var(--color-primary);
+}
+
+.svg-pan-zoom-control:hover {
+    fill: var(--color-primary-light);
+}
+
+.svg-pan-zoom-control-background {
+    fill: white;
+    fill-opacity: 1;
+}
