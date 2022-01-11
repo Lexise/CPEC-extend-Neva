@@ -21,7 +21,7 @@ from dash import dash_table
 from ctypes import c_char_p
 import plotly.graph_objects as go
 from flask_caching import Cache
-from flask import Flask, send_from_directory,request
+from flask import Flask, send_from_directory, request
 from clustering_correlation import compute_serial_matrix,innovative_correlation_clustering,my_optimal_leaf_ordering,abs_optimal_leaf_ordering
 import numpy as np
 # from process_data import process_data,clean_folder,get_color_label, find_feature_group, process_data_two_sets,\
@@ -44,16 +44,12 @@ ASP_DIR=APP_PATH+'/asp_encoding/'
 ZIP_DIRECTORY=APP_PATH + "/data/processed_zip/"
 if not os.path.exists(UPLOAD_DIRECTORY):
     os.makedirs(UPLOAD_DIRECTORY)
-    print("created")
 if not os.path.exists(PROCESSED_DIRECTORY):
     os.makedirs(PROCESSED_DIRECTORY)
-    print("created")
 if not os.path.exists(CACHE_DIRECTORY):
     os.makedirs(CACHE_DIRECTORY)
-    print("created")
 if not os.path.exists(ZIP_DIRECTORY):
     os.makedirs(ZIP_DIRECTORY)
-    print("created")
 
 #from subprocess import Popen, PIPE
 # p = os.popen('ls -la')
@@ -69,17 +65,9 @@ cache_config = {
 }
 
 # Empty cache directory before running the app
-#if
 clean_folder(CACHE_DIRECTORY)
-# folder = os.path.join(APP_PATH, "data/cache/")
-# for the_file in os.listdir(folder):
-#     file_path = os.path.join(folder, the_file)
-#     try:
-#         if os.path.isfile(file_path):
-#             os.unlink(file_path)
-#     except Exception as e:
-#         print(e)
 
+# Resources 
 @server.route("/download/<path:path>")
 def download(path):
     """Serve a file from the upload directory."""
@@ -92,25 +80,40 @@ def download(path):
     else:
         return send_from_directory(DEFAULT_DATA, path, as_attachment=True)
 
+@server.route("/data")
+def data():
+    content = request.args['content'] if 'content' in request.args else ''
+    reduction = request.args['reduction'] if 'reduction' in request.args else 'tsne' #tsne, svd, auto
+    cluster_method = request.args['cluster_method'] if 'cluster_method' in request.args else 'db' #db, km
+    n_click = None
 
+    data, color_label = get_data(n_click)
+    
+    x_axe = reduction + "_position_x"
+    y_axe = reduction + "_position_y"
+    method = cluster_method + '_cluster_label'
+    
+    print(data.columns)
 
-@server.route("/hello")
-def hello():
-    """Serve a file from the upload directory."""
-    return 'hello world'
+    return data[[x_axe, y_axe, method, color_label]].rename(
+        columns = {
+            x_axe :'x',
+            y_axe :'y',
+            method : 'c',
+        }).T.to_json()
 
-
-# @server.route("/")
-# def query_progress():
-#     name = request.args.get('name')
-#     print(name)
-#     with open('/tmp/data.txt', 'r') as f:
-#         data = f.read()
-#         records = json.loads(data)
-#         for record in records:
-#             if record['name'] == name:
-#                 return jsonify(record)
-#         return jsonify({'error': 'data not found'})
+def get_data(n_click = None, name = "processed_data", check_combined = True):
+    if check_combined and len(os.listdir(PROCESSED_DIRECTORY)) == 12 and os.path.isfile(PROCESSED_DIRECTORY + "CombinedProcessed_data.pkl"): #or semantic =="cf2_stage2":
+        color_label = "category"
+        processed_data = pd.read_pickle(PROCESSED_DIRECTORY + "CombinedProcessed_data.pkl") #pd.concat([present_data1,present_data2,present_common])
+    else:
+        color_label = "groups"
+        if len(os.listdir(PROCESSED_DIRECTORY)) == 6 or n_click:  # load and processed
+            processed_data = pd.read_pickle(PROCESSED_DIRECTORY + name + ".pkl")
+        else:
+            processed_data = pd.read_pickle(DEFAULT_DATA + name + '.pkl')
+        
+    return processed_data, color_label
 
 
 
@@ -148,16 +151,7 @@ layout = dict(
         )
 )
 
-
-#dataset=pd.read_pickle('new_test.pkl')
-# with open(UPLOAD_DIRECTORY+'long-island-railroad_20090825_0512.gml.20.apx', 'r') as file:
-#     test = file.read()
-# print(test)
-# if  len(os.listdir(PROCESSED_DIRECTORY))==6:
-#     loaded_processed_data = pd.read_pickle(PROCESSED_DIRECTORY + "processed_data.pkl")
-# else:
-#     loaded_processed_data=pd.read_pickle(DEFAULT_DATA + 'bar_data.pkl')
-if  len(os.listdir(PROCESSED_DIRECTORY))==12:
+if len(os.listdir(PROCESSED_DIRECTORY))==12:
     processed_semantics=get_current_processed_dir_semantic(PROCESSED_DIRECTORY)
 else:
     processed_semantics=['stable','preferred']
@@ -167,21 +161,11 @@ cache = Cache()
 cache.init_app(app.server, config=cache_config)
 
 TIMEOUT = 120
-df = pd.DataFrame(
-    {
-        "First Name": ["Arthur", "Ford", "Zaphod", "Trillian"],
-        "Last Name": ["Dent", "Prefect", "Beeblebrox", "Astra"],
-    }
-)
-
-
-
 
 def file_download_link(filename):
     """Create a Plotly Dash 'A' element that downloads a file from the app."""
     location = "/download/{}".format(urlquote(filename))
     return html.A(filename, href=location)
-
 
 def get_file_name(dir):
     files = uploaded_files(dir)
@@ -189,7 +173,6 @@ def get_file_name(dir):
         return [html.Li("")]
     else:
         return [html.Li(file_download_link(filename)) for filename in files]
-
 
 argument_analysis=html.Div([
 
@@ -363,7 +346,6 @@ argument_analysis=html.Div([
     #     className="row flex-display",
     # ),
     ],
-
 )
 
 correlation_page= html.Div([
@@ -444,37 +426,22 @@ main_page = html.Div([
 
 
     html.Div([
-                    html.Div([
-                    dcc.Graph(
-                        id="scatter_groups",style={'display':'none'})
-                    ],
-                    className="bare_container"),
+        html.Div([ dcc.Graph( id="scatter_groups",style={'display':'none'}) ], className="bare_container"),
 
+        html.Div([
+            dcc.Graph(id="3d_scatter_cluster",className="row flex-display",style={'display':'none'}),
+            dcc.Graph(id="3d_scatter_group", className="row flex-display",style={'display':'none'}),
+            ],
 
-
-
-                    html.Div([
-                    dcc.Graph(id="3d_scatter_cluster",className="row flex-display",style={'display':'none'}),
-
-                    dcc.Graph(id="3d_scatter_group", className="row flex-display",style={'display':'none'}),
-                    ],
-
-                    className="row flex-display",
-                    style={'border-radius': '5px',
-                          'margin': '12px',
-                          'padding': '17px'}
-                ),
-
-
+            className="row flex-display",
+            style={
+                'borderRadius': '5px',
+                'margin': '12px',
+                'padding': '17px'
+            }
+        ),
 
         ], className="row flex-display",
-           # style={'margin':dict(l=10, r=0, b=0, t=0)}
-        # parent_style={'flex-direction': 'column',
-        #                            '-webkit-flex-direction': 'column',
-        #                            '-ms-flex-direction': 'column',
-        #                           'display': 'flex'},
-        #vertical = True
-
         ),
 
 
@@ -553,12 +520,6 @@ main_page = html.Div([
         ),
 
         html.Div(id='hover-data'),
-
-        # html.Br(),
-        # dcc.Link(html.Button('Argument Analysis',style={'width': '32%','fontSize':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-argument'),
-        # #dcc.Link(html.Button('3D Analysis',style={'marginLeft': '2%','width': '32%','fontSize':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-3d'),
-        # dcc.Link(html.Button('Correlation Matrix',style={'marginLeft': '2%', 'width': '32%','fontSize':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-correlation'),
-        # html.Hr(),
         html.Div([
         dcc.Tabs([
 
@@ -566,12 +527,8 @@ main_page = html.Div([
                 html.Div(
                     [
                     html.Div([
-                        dcc.Upload([html.Button(children='UPLOAD APX', id="upload_button")], id="upload-data",
-                                   style={'width': '13%', 'marginLeft': '16%', 'marginTop': '1%', 'fontSize': '15px',
-                                          'fontWeight': 'bold', "color": "#FFFF",'marginRight': '10%'}, multiple=True),
-                        dcc.Upload([html.Button(children='UPLOAD Extensions', id="upload_ex_button")], id="upload-ex-data",
-                                   style={'width': '13%', 'marginLeft': '15%', 'marginTop': '1%', 'fontSize': '15px',
-                                          'fontWeight': 'bold', "color": "#FFFF"}, multiple=True),
+                        dcc.Upload([html.Button(children='UPLOAD APX', id="upload_button")], id="upload-data", multiple=True),
+                        dcc.Upload([html.Button(children='UPLOAD Extensions', id="upload_ex_button")], id="upload-ex-data", multiple=True),
                     ],
                     className = "row flex-display"),
                     html.Div([
@@ -586,7 +543,7 @@ main_page = html.Div([
                         ],
                     className="pretty_container",),
 
-                    #style={'border-radius': '15px'}),
+                    #style={'borderRadius': '15px'}),
                      ],
                 className ='empty_container six columns',
                 ),
@@ -621,21 +578,7 @@ main_page = html.Div([
                     # ),
                     html.Div(
                         [
-                    # dcc.Checklist(
-                    #     id="check_semantics2",
-                    #     options=[
-                    #         {'label': 'Preferred ', 'value': 'preferred'},
-                    #         {'label': 'Stable', 'value': 'stable'},
-                    #         {'label': 'Stage', 'value': 'stage'},
-                    #         {'label': 'Stage2', 'value': 'stage2'},
-                    #         {'label': 'CF2', 'value': 'cf2'},
-                    #         {'label': "Semi-Stable", 'value': 'semi-stable'}
-                    #     ],
-                    #     value=[],
-                    #     labelStyle={'display': 'inline-block'},
-                    #    # style={'width': '17%'},
-                    #
-                    # ),
+         
 
                     dcc.Dropdown(
                         id="check_semantics2",
@@ -783,32 +726,6 @@ main_page = html.Div([
         className="my_container"
         ),
 
-
-        #html.Br(),
-        # html.Div([
-        #     html.Div([
-        #
-        #         html.Div([
-        #             html.P("Upload",className="dcc_control",style={"width":"91%",'textAlign': 'left'}),
-        #             html.Button(id='clear-upload', n_clicks=0, children='Clear',style={'width': '12%','fontSize':'11px','textAlign': 'right'}),
-        #
-        #         ],
-        #             className="row flex-display",
-        #             #style={'textAlign': 'right'}
-        #         ),
-        #         html.Ul(id="file-list", children=get_file_name(UPLOAD_DIRECTORY))
-        #     ],
-        #         className="pretty_container seven columns"),
-        #
-        #     html.Div([
-        #         html.P("Processed"),
-        #         html.Ul(id="processed-list", children=get_file_name(ZIP_DIRECTORY))
-        #     ],
-        #         className="pretty_container seven columns")
-        # ],
-        #     className="row flex-display"
-        # )
-
         ],
     className='my_main_container',
     #style={'height': '100%'}
@@ -863,8 +780,6 @@ ThreeD_analysis = html.Div([
 )
 
 app.layout = html.Div([
-
-
     dcc.Location(id='url', refresh=False),
     html.Div(id='page-content'),
     # hidden signal value
@@ -880,7 +795,6 @@ app.layout = html.Div([
      style={'height':'100vh', 'margin':dict(l=0, r=0, b=0, t=0)}
     #style={"display": "flex", "flex-direction": "column"},
 )
-
 
 
 def global_individual(eps, minpts, n_cluster, use_optim, semantics):
@@ -906,37 +820,31 @@ def global_individual(eps, minpts, n_cluster, use_optim, semantics):
         ])
         # zipname=files[0].strip("apx")+"zip"
     try:
-       print('cleaned:', clean_folder(PROCESSED_DIRECTORY))
-       temp_para=[]
-       process_individual_semantics = Process_data("start")
-       for a_semantic in semantics:
+        print('cleaned:', clean_folder(PROCESSED_DIRECTORY))
+        temp_para=[]
+        process_individual_semantics = Process_data("start")
+        for a_semantic in semantics:
 
-          if len(extensions) == 0:
-              extension=process_individual_semantics.process_extension_individual(question, a_semantic, PROCESSED_DIRECTORY, UPLOAD_DIRECTORY,
-                                           EXTENSION_DIR, ASP_DIR)
+            if len(extensions) == 0:
+                extension=process_individual_semantics.process_extension_individual(question, a_semantic, PROCESSED_DIRECTORY, UPLOAD_DIRECTORY, EXTENSION_DIR, ASP_DIR)
+            else:
+                extension = process_individual_semantics.find_semantic_files(extensions, a_semantic)
 
-
-          else:
-              extension = process_individual_semantics.find_semantic_files(extensions, a_semantic)
-
-          transfered, arguments, itemlist = process_individual_semantics.initial_process_individual(PROCESSED_DIRECTORY,
+            transfered, arguments, itemlist = process_individual_semantics.initial_process_individual(PROCESSED_DIRECTORY,
                                                                            UPLOAD_DIRECTORY + question,
                                                                            EXTENSION_DIR + extension, a_semantic)
-          temp_para.append({'semantic':a_semantic,'transfered':transfered,'arguments':arguments,'itemlist':itemlist})
+            temp_para.append({'semantic':a_semantic,'transfered':transfered,'arguments':arguments,'itemlist':itemlist})
 
-       process_individual_semantics.get_catogery(PROCESSED_DIRECTORY, semantics)
-       for item in temp_para:
+        process_individual_semantics.get_catogery(PROCESSED_DIRECTORY, semantics)
+        for item in temp_para:
             process_individual_semantics.process_data_two_sets(PROCESSED_DIRECTORY, UPLOAD_DIRECTORY + question, item['transfered'], item['arguments'], item['itemlist'], eps,
                              minpts,
                              n_cluster, use_optim, item['semantic'])
-       process_individual_semantics.addional_process_individual(PROCESSED_DIRECTORY,semantics)
-       print("whole process time consuming: ", time.process_time() - start_time0)
+        process_individual_semantics.addional_process_individual(PROCESSED_DIRECTORY,semantics)
+        print("whole process time consuming: ", time.process_time() - start_time0)
     except Exception as e:
         print('error:',e)
-        return html.Div([
-            'input data is not proper.'
-        ])
-
+        return html.Div([ 'input data is not proper.' ])
 
     return True
 
@@ -1030,30 +938,13 @@ def global_store(eps, minpts, n_cluster, use_optim,semantics):
         print("the form of input file is not correct.")
         return False
 
-# @app.callback(
-#     Output("popover", "is_open"),
-#     [Input("eps", "clickData")],
-#     [State("popover", "is_open")],
-# )
-# def toggle_popover(n, is_open):
-#     if n:
-#         return not is_open
-#     return is_open
+
 @app.callback(Output('check_semantics2_style', 'style') ,[Input("check_semantics", "value")])
 def show_other_option(semantics):
     if semantics=="others":
         return {'display': 'block', 'width': '17%','marginLeft': '0.5%'}
 
     return {'display': 'none'}
-
-
-# @app.callback(Output('clustering-method', 'options') ,[Input("memory-semantic", "data")])
-# def show_other_option(semantics):
-#     if len(semantics)<2:
-#         return dash.exceptions.PreventUpdate
-#     else:
-#      return semantics
-
 
 @app.callback([Output('signal', 'children'),Output('memory-semantic', 'data'),] ,[Input('submit-button-state', 'n_clicks'),Input("check_semantics", "value")],
               [State("default_params", "value"),State('eps', 'value'), State('minpts', 'value'), State('cluster_num', 'value'),State('store-prev-comparisons', 'data')])
@@ -1078,9 +969,6 @@ def compute_value( n_clicks, semantics, use_optim, eps, minpts, n_cluster,semant
     # global_store(value)
     # return value
 
-
-
-
 @app.callback([Output('store-prev-comparisons', 'data')],
                      [Input('check_semantics', 'value'),Input('check_semantics2', 'value'),Input('submit-button-state', 'n_clicks')])
 def select_comparison(semantic1,comparisons, submit_click):
@@ -1102,9 +990,6 @@ def select_comparison(semantic1,comparisons, submit_click):
   else:
     # when <= 3 don't modify store-prev-comparisons and therefore don't trigger above
     raise dash.exceptions.PreventUpdate#dash.no_update
-
-
-
 
 @app.callback(
     Output("file-list", "children"),
@@ -1179,30 +1064,11 @@ def display_click_data(drop_selection, clickData2, method,n_click):
     if drop_selection and drop_selection=='upload-user':
         return None
     changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
-    if len(os.listdir(PROCESSED_DIRECTORY)) == 12: # or len(os.listdir(PROCESSED_DIRECTORY)) == 5:
-           processed_data = pd.read_pickle(PROCESSED_DIRECTORY + "CombinedProcessed_data.pkl")
-           label="category"
-    else:
-        label="groups"
-        if  len(os.listdir(PROCESSED_DIRECTORY))==6 or n_click:#load and processed
-
-                processed_data = pd.read_pickle(PROCESSED_DIRECTORY + "processed_data.pkl")
-        else:
-                processed_data = pd.read_pickle(DEFAULT_DATA + 'processed_data.pkl')
-
-
-
+    processed_data, label = get_data(n_click)
     cluster_label = method + "_cluster_label"
 
     print("changed_id:",[p['prop_id'] for p in dash.callback_context.triggered])
-    # if clickData1 or clickData2:
-    #     if "scatter_cluster" in changed_id:
-    #         clickData=clickData1
-    #         print("clickData1",clickData1)
-    #     elif "scatter_groups" in changed_id:
-    #         clickData = clickData2
-    #     else:
-    #         return None
+
     if clickData2:
         if "scatter_groups" in changed_id:
             print("clickData2", clickData2)
@@ -1266,17 +1132,7 @@ def chnage_selection(semantic_checks, signal_content):
 
 def generate_tabs1( content, reduction1,  method, n_click,semantic, present_semantic):#processed_data, table1_data,table2_data ):
     try:
-        if len(os.listdir(PROCESSED_DIRECTORY)) == 12: #or semantic == "cf2_stage2":
-
-            processed_data = pd.read_pickle(PROCESSED_DIRECTORY + present_semantic+"_processed_data.pkl")
-
-        else:
-
-            if  len(os.listdir(PROCESSED_DIRECTORY))==6 or n_click:#load and processed
-                   processed_data = pd.read_pickle(PROCESSED_DIRECTORY + "processed_data.pkl")
-            else:
-                processed_data = pd.read_pickle(DEFAULT_DATA + 'processed_data.pkl')
-
+        processed_data, _ = get_data(n_click)
 
         if reduction1=="svd":
             x_axe="svd_position_x"
@@ -1370,35 +1226,27 @@ def generate_tabs1( content, reduction1,  method, n_click,semantic, present_sema
 
               )
 def generate_tabs(content, selected_visual, semantic, reduction2, cluster_method, n_click):
-            if selected_visual=='dropdown-2d':
-                fig=generate_tabs2(content,reduction2, cluster_method, n_click)
-                return fig,{'display':'block'},{},{},{'display':'none'},{'display':'none'},{'display':'none'},{'display':'flex','position': 'relative' }
-            elif selected_visual=='dropdown-3d':
-                fig1,fig2=display3d(reduction2, semantic, cluster_method)
-                return {},{'display':'none'},fig1,fig2,{'display':'block'},{'display':'block'},{'display':'none'},{'display':'flex','position': 'relative' }
-            elif selected_visual=='upload-user':
-                return {},{'display':'none'},{}, {},{'display':'none'},{'display':'none'},{'display':'block'},{'display':'none'}
-            else:
-                raise dash.exceptions.PreventUpdate#return {},{'display':'none'},{}, {},{'display':'none'},{'display':'none'}
+    if selected_visual=='dropdown-2d':
+        fig=generate_tabs2(reduction2, cluster_method, n_click)
+
+        print("Callback variables")
+        print(fig)
+        print("End callback variables")
+        return fig,{'display':'block'},{},{},{'display':'none'},{'display':'none'},{'display':'none'},{'display':'flex','position': 'relative' }
+    elif selected_visual=='dropdown-3d':
+        fig1,fig2=display3d(reduction2, semantic, cluster_method)
+        return {},{'display':'none'},fig1,fig2,{'display':'block'},{'display':'block'},{'display':'none'},{'display':'flex','position': 'relative' }
+    elif selected_visual=='upload-user':
+        return {},{'display':'none'},{}, {},{'display':'none'},{'display':'none'},{'display':'block'},{'display':'none'}
+    else:
+        raise dash.exceptions.PreventUpdate#return {},{'display':'none'},{}, {},{'display':'none'},{'display':'none'}
 
 
 
 # @cache.memoize(TIMEOUT)
-def generate_tabs2(content, reduction2, method, n_click):  # method):
+def generate_tabs2(reduction2, method, n_click):  # method):
 
-    if len(os.listdir(PROCESSED_DIRECTORY)) == 12 and os.path.isfile(PROCESSED_DIRECTORY + "CombinedProcessed_data.pkl"): #or semantic =="cf2_stage2":
-
-        color_label="category"
-        processed_data=pd.read_pickle(PROCESSED_DIRECTORY + "CombinedProcessed_data.pkl")#pd.concat([present_data1,present_data2,present_common])
-
-
-    else:
-        color_label = "groups"
-        if len(os.listdir(PROCESSED_DIRECTORY)) == 6 or n_click:  # load and processed
-                processed_data = pd.read_pickle(PROCESSED_DIRECTORY + "processed_data.pkl")
-
-        else:
-                processed_data = pd.read_pickle(DEFAULT_DATA + 'processed_data.pkl')
+    processed_data, color_label = get_data(n_click)
 
     if reduction2 == "svd":
         x_axe = "svd_position_x"
@@ -1406,25 +1254,6 @@ def generate_tabs2(content, reduction2, method, n_click):  # method):
     else:
         x_axe = "tsne_position_x"
         y_axe = "tsne_position_y"
-    #cluster_label = method + "_cluster_label"
-
-
-        # let hover on the plot directly
-        # figure2 = px.scatter(processed_data, x=x_axe, y=y_axe, color="groups",
-        #                      hover_name="groups", hover_data={x_axe: False,  # remove species from hover data
-        #                                                       y_axe: False,
-        #                                                       cluster_label: True,
-        #                                                       'id': True,
-        #                                                       'arg': True,  # add other column, default formatting
-        #                                                       'groups': False,  # add other column, customized formatting
-        #
-        #                                                       })
-        # figure2.update_xaxes(showgrid=False, visible=False)
-        # figure2.update_yaxes(showgrid=False, zeroline=True, visible=False, zerolinecolor="black")
-        # figure2.update_layout(plot_bgcolor='rgba(0,0,0,0)', legend_title_text='Groups', autosize=True)
-        # figure2 = go.Figure(figure2)
-
-        # remove hover, provide an extra table to show the arg information of selected data point
 
     fig = go.Figure()
 
@@ -1457,26 +1286,13 @@ def generate_tabs2(content, reduction2, method, n_click):  # method):
     cluster_label = method + "_cluster_label"
     #processed_data[cluster_label] = ["Cluster " + str(a) for a in processed_data[cluster_label]]
     cluster_set = list(processed_data[cluster_label].unique())
-#    colors=get_colors(len(cluster_set))#['blue','red','green','yellow']
+    #    colors=get_colors(len(cluster_set))#['blue','red','green','yellow']
     num_color=len(cluster_set)
     if num_color>8:
         colors=get_colors(len(cluster_set))#['rgb'+str(x) for x in sns.color_palette(n_colors=len(cluster_set))]
     else:
         colors=[WELL_COLOR_new[i] for i in range(num_color)]
-    # for clabel in cluster_set:
-    #     select=processed_data[processed_data[cluster_label] == clabel]
-    #     x_list = select[x_axe]
-    #     y_list = select[y_axe]
-    #     # fig.add_shape(type="circle",
-    #     #               xref="x", yref="y",
-    #     #               x0=x_list.min(), y0=y_list.min(),
-    #     #               x1=x_list.max(), y1=y_list.max(),
-    #     #               opacity=0.3,
-    #     #               layer="below",
-    #     #               fillcolor=colors[cluster_set.index(clabel)],
-    #     #               line_color=colors[cluster_set.index(clabel)],
-    #     #               name='cluster'+str(clabel)
-    #     #               )
+
     data=processed_data
     for cls in cluster_set:
         fig.add_trace(
@@ -1499,37 +1315,6 @@ def generate_tabs2(content, reduction2, method, n_click):  # method):
                 ),
             ))
 
-
-
-        # go.Scatter(
-        #     x=x_list,
-        #     y=y_list,
-        #     #fill="toself",
-        #     mode='markers',
-        #
-        #     # marker=dict(
-        #     #                   size=15,
-        #     #                   color=colors[cluster_set.index(clabel)],
-        #     #     #colorscale='Viridis',
-        #     #     opacity=0.06
-        #     # ),
-        #     marker=dict(
-        #         #size=4,
-        #         #color=colors[cluster_set.index(clabel)],
-        #         #
-        #         colorscale='Viridis',
-        #         opacity=0.8
-        #     ),
-        #     customdata=select["id"],
-        #     name=clabel,
-        #     #line_color=colors[cluster_set.index(clabel)],
-        #     #text=clabel,
-        #
-        # )
-
-
-    #fig.layout.plot_bgcolor = '#386cb0'
-
     fig.update_layout(xaxis={'showgrid': False, 'visible': False, },
                       yaxis={'showgrid': False, 'visible': False, },
                       plot_bgcolor='rgba(0,0,0,0)',
@@ -1547,81 +1332,6 @@ def generate_tabs2(content, reduction2, method, n_click):  # method):
     return fig#, {'display': 'block'}
 
 
-
-# @app.callback([ Output('table1', 'children'),
-#                Output('table2', 'children')],
-#               [Input('signal', 'children'),
-#                Input("clustering-method", "value"),
-#                Input('confirm', 'submit_n_clicks'),Input("semantic-method-1", "value"),])
-# # @cache.memoize(TIMEOUT)
-# def generate_tabs3(content,   cluster_method,
-#                    n_click, table_method):  # processed_data, table1_data,table2_data ):
-#     if len(os.listdir(PROCESSED_DIRECTORY)) == 12:
-#         group_table = pd.read_pickle(PROCESSED_DIRECTORY + "group_feature.pkl")
-#         # semantics=get_current_processed_dir_semantic(PROCESSED_DIRECTORY)
-#         # if table_method not in semantics:
-#         #     cluster_table = pd.read_pickle(
-#         #         PROCESSED_DIRECTORY + semantics[0] + "_" + cluster_method + "_cluster_feature.pkl")
-#         # else:
-#         #     cluster_table = pd.read_pickle(PROCESSED_DIRECTORY + table_method+ "_"+cluster_method+ "_cluster_feature.pkl")
-#         cluster_table = pd.read_pickle(
-#             PROCESSED_DIRECTORY + table_method + "_" + cluster_method + "_cluster_feature.pkl")
-#     elif len(os.listdir(PROCESSED_DIRECTORY)) == 6 or n_click:  # load and processed
-#
-#             group_table = pd.read_pickle(PROCESSED_DIRECTORY + "group_feature.pkl")
-#             cluster_table = pd.read_pickle(PROCESSED_DIRECTORY +  cluster_method + "_cluster_feature.pkl")
-#
-#
-#     else:
-#             group_table = pd.read_pickle(DEFAULT_DATA+"group_feature.pkl")
-#             if cluster_method == "km":
-#                 cluster_table = pd.read_pickle(DEFAULT_DATA+"km_cluster_feature.pkl")
-#             else:
-#                 cluster_table = pd.read_pickle(DEFAULT_DATA+"db_cluster_feature.pkl")
-#
-#
-#     # table
-#     if len(group_table) == 0:
-#         table1 = html.H5("No group feature")
-#     else:
-#         table1 = dash_table.DataTable(
-#             data=group_table.to_dict('records'),
-#             columns=[{"name": i, "id": i} for i in group_table.columns],
-#             style_table={
-#                 'maxHeight': '300px',
-#                 'overflowY': 'scroll'
-#             },
-#             style_header={
-#                 'fontWeight': 'bold'
-#             },
-#             style_cell={
-#                 'font_size': '20px',
-#                 'text_align': 'center'
-#             },
-#         )
-#
-#     if not len(cluster_table):
-#         table2 = html.H5("No cluster Feature")
-#     else:
-#         table2 = dash_table.DataTable(
-#             data=cluster_table.to_dict('records'),
-#             columns=[{"name": i, "id": i} for i in cluster_table.columns],
-#
-#             style_table={
-#                 'maxHeight': '300px',
-#                 'overflowY': 'scroll'
-#             },
-#             style_header={
-#                 'fontWeight': 'bold'
-#             },
-#             style_cell={
-#                 'font_size': '20px',
-#                 'text_align': 'center'
-#             },
-#         )
-#     return  table1, table2
-
-
 @app.callback(
     [Output("bar_chart", "figure"),Output("my-range-slider","figure")],
     [Input("data_present_selector", "value"),Input("my-range-slider", "value"),Input("sort_selector", "value")],
@@ -1629,21 +1339,7 @@ def generate_tabs2(content, reduction2, method, n_click):  # method):
 @cache.memoize(TIMEOUT)
 def make_bar_figure(present_data, valuelist,sort_state):
 
-    if len(os.listdir(PROCESSED_DIRECTORY)) == 12 and os.path.isfile(PROCESSED_DIRECTORY + "CombinedProcessed_data.pkl"): #change it later
-
-
-        processed_data=pd.read_pickle(PROCESSED_DIRECTORY + "CombinedProcessed_data.pkl")#pd.concat([present_data1,present_data2,present_common])
-
-
-    else:
-        color_label = "groups"
-        if len(os.listdir(PROCESSED_DIRECTORY)) == 6:  # load and processed
-                dataset_bar = pd.read_pickle(PROCESSED_DIRECTORY + "bar_data.pkl")
-
-        else:
-                dataset_bar = pd.read_pickle(DEFAULT_DATA+'bar_data.pkl')
-
-
+    dataset_bar, _ = get_data(name = "bar_data")
 
     slider=dict(
         min = 0,
@@ -1679,7 +1375,7 @@ def set_bar_figure(argument_data, valuelist):
             type="bar",
             x=list([ x.replace('argument', '') for x in selected["argument"] ]),
             y=list(selected["rate"]),
-            hovertext={"fontsize":20},
+            hovertext={"fontSize":20},
             #hovertext=["attribute:{arg},rate:{percent}".format(arg=row.attribute,percent=row.rate) for index,row in selected.iterrows()],
             name="All Wells"
         )]
@@ -1692,49 +1388,12 @@ def set_bar_figure(argument_data, valuelist):
     layout_count["showlegend"] = False
     layout_count["autosize"] = True,
     layout_count["titlefont"] = {"size": 25}
-    layout_count["marker"] = {"fontsize": 10}
+    layout_count["marker"] = {"fontSize": 10}
     if 'xaxis' in layout_count:
         del layout_count['xaxis']
         del layout_count['yaxis']
     figure = dict(data=data, layout=layout_count)
     return figure
-
-# @app.callback(
-#     [Output("confirm", "displayed")],
-#     [Input("view-processed-button", "filename"), Input("view-processed-button", "contents"),Input("view_button","n_clicks")]
-#     )
-# def run_processed_data(uploaded_filenames, uploaded_file_contents,n_click ):
-#     if n_click is None:
-#         return [False]
-#     if len(os.listdir(PROCESSED_DIRECTORY))!=0 and uploaded_filenames is not None and n_click%6==1:
-#         clean_folder(PROCESSED_DIRECTORY)
-#     print("click number: ",n_click)
-#     print("upload_name:",uploaded_filenames)
-#     if uploaded_filenames is not None and uploaded_file_contents is not None:
-#         for name, data in zip([uploaded_filenames], [uploaded_file_contents]):
-#             save_file(name, data, PROCESSED_DIRECTORY)
-#         if len(os.listdir(PROCESSED_DIRECTORY)) >=6:
-#             return [True]
-#     return [False]
-
-#
-# @app.callback([Output("confirm", "displayed")],
-#               [Input('view-processed-button', 'contents')],
-#               [State('view-processed-button', 'filename')])
-# def update_output(content, name):
-#     if content is None:
-#         return [False]
-#     #for content, name, date in zip(list_of_contents, list_of_names, list_of_dates):
-#         # the content needs to be split. It contains the type and the real content
-#     content_type, content_string = content.split(',')
-#     # Decode the base64 string
-#     content_decoded = base64.b64decode(content_string)
-#     # Use BytesIO to handle the decoded content
-#     zip_str = io.BytesIO(content_decoded)
-#     # Now you can use ZipFile to take the BytesIO output
-#     zip_obj = ZipFile(zip_str, 'r')
-#     zip_obj.extractall(PROCESSED_DIRECTORY)
-#     return [True]
 
 @app.callback([Output("stop_confirm", "displayed"),Output("progress-extension", "animated"),Output("progress-process", "animated")] ,  #should be style
        [Input('submit-button-state', 'n_clicks'), ], #Input("signal","children"),
@@ -1820,13 +1479,7 @@ def update_output(children1, children2, n_click):
 
 
 def update_cluster_rate(clickData, cluster_method):
-    if os.listdir(PROCESSED_DIRECTORY):  # load and processed
-
-            process_data = pd.read_pickle(PROCESSED_DIRECTORY + "processed_data.pkl")
-
-    else:
-
-            process_data = processed_data = pd.read_pickle(DEFAULT_DATA + 'processed_data.pkl')
+    process_data, _ = get_data(check_combined = False)
 
     mini_block=[]
     layout_pie={}
@@ -1834,11 +1487,11 @@ def update_cluster_rate(clickData, cluster_method):
     if clickData is None:
         return "Selected Argument: None",mini_block,dict(data=None, layout=layout_pie),
     temp=clickData["points"][0]
-    arguments=re.search(r'\d+', temp["x"]).group()  #int()
+    arguments=int(re.search(r'\d+', str(temp["x"])).group())
     selected=[]
     result0= "Selected Argument:{}  \n".format(arguments)
     for index, row in process_data.iterrows():
-        if arguments in row.arg:
+        if str(arguments) in row.arg:
             selected.append(index)
     if len(selected) == 0:
         return "No data has this argument",mini_block,dict(data=None, layout=layout_pie),
@@ -1956,28 +1609,17 @@ def update_cluster_rate(clickData, cluster_method):
 
 def update_graph(clickData, dimensional_reduction, cluster_method):
 
-    if os.listdir(PROCESSED_DIRECTORY):  # load and processed
-
-            process_data = pd.read_pickle(PROCESSED_DIRECTORY + "processed_data.pkl")
-
-    else:
-
-            process_data = pd.read_pickle(DEFAULT_DATA + "processed_data.pkl")
-
-
-    layout_scatter ={"title":"Distribution of Selected Argument",
-                       "clickmode":'event+select'
-                       }
-
+    process_data, _ = get_data(check_combined = False)
+    layout_scatter ={"title":"Distribution of Selected Argument", "clickmode":'event+select'}
 
     if clickData is None:
         return {"layout":layout_scatter}
     temp=clickData["points"][0]
     cluster_label=cluster_method +"_cluster_label"
-    arguments=re.search(r'\d+', temp["x"]).group()#int()
+    arguments=int(re.search(r'\d+', str(temp["x"])).group())
     selected=[]
     for index, row in process_data.iterrows():
-        if arguments in row.arg:
+        if str(arguments) in row.arg:
             selected.append(index)
     data=process_data.loc[selected]
     unselected_data=process_data[~process_data.index.isin(selected)]
@@ -2026,28 +1668,7 @@ def update_graph(clickData, dimensional_reduction, cluster_method):
 #               )
 def display3d( reduction_method, semantics,cluster_method):
     #print("3d click:", selected_3d)
-    if len(os.listdir(PROCESSED_DIRECTORY)) == 12:  # or semantic == "cf2_stage2":
-        try:
-            data = pd.read_pickle(PROCESSED_DIRECTORY + semantics + "_processed_data.pkl")
-            group_label='category'
-        except IOError:
-            print("File not accessible")
-
-
-    else:
-        group_label = 'groups'
-        if len(os.listdir(PROCESSED_DIRECTORY)) == 6:  # load and processed
-            data = pd.read_pickle(PROCESSED_DIRECTORY + "processed_data.pkl")
-        else:
-            data = pd.read_pickle(DEFAULT_DATA + 'processed_data.pkl')
-
-    # if os.listdir(PROCESSED_DIRECTORY)==5:  # load and processed
-    #
-    #         data = pd.read_pickle(PROCESSED_DIRECTORY + "processed_data.pkl")
-    #
-    # else:
-    #
-    #         data = pd.read_pickle(DEFAULT_DATA + "processed_data.pkl")
+    data, group_label = get_data()
 
     if reduction_method=="svd":
         x_axe="svd_position_x"
@@ -2183,15 +1804,8 @@ def display3d( reduction_method, semantics,cluster_method):
               [Input('btn-nclicks-1', 'n_clicks'),Input('btn-nclicks-2', 'n_clicks'),Input('btn-nclicks-3', 'n_clicks'),Input('btn-nclicks-4', 'n_clicks')])
 def displayClick(btn1, btn2 , btn3, btn4):
 
-    if  len(os.listdir(PROCESSED_DIRECTORY)) == 6:  # load and processed
-
-            data_correlation = pd.read_pickle(PROCESSED_DIRECTORY + "correlation_matrix.pkl")
-            processed_data=pd.read_pickle(PROCESSED_DIRECTORY + "processed_data.pkl")
-
-    else:
-
-            data_correlation = pd.read_pickle(DEFAULT_DATA + "correlation_matrix.pkl")
-            processed_data=pd.read_pickle(DEFAULT_DATA + "processed_data.pkl")
+    data_correlation, _ = get_data(btn1, "correlation_matrix", False)
+    processed_data, _ = get_data(btn1, "processed_data", False)
 
     changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
 
@@ -2285,38 +1899,25 @@ def displayClick(btn1, btn2 , btn3, btn4):
     fig.update_xaxes(side="top")
     return fig
 
-
-
-@app.callback([ Output('feature_semantic_table', 'children'),
+@app.callback([Output('feature_semantic_table', 'children'),
                Output('feature_cluster_table', 'children')],
               [Input('signal', 'children'),
                Input("clustering-method", "value"),
                Input('confirm', 'submit_n_clicks'),Input("semantic-method-1", "value"),])
-def get_feature_table(content,   cluster_method,
-                   n_click, table_method):
+def get_feature_table(content, cluster_method, n_click, table_method):
     if len(os.listdir(PROCESSED_DIRECTORY)) == 12:
         group_table = pd.read_pickle(PROCESSED_DIRECTORY + "group_feature.pkl")
-        cluster_table = pd.read_pickle(
-            PROCESSED_DIRECTORY + table_method + "_" + cluster_method + "_cluster_feature.pkl")
-    elif len(os.listdir(PROCESSED_DIRECTORY)) == 6 or n_click:  # load and processed
-
-        group_table = pd.read_pickle(PROCESSED_DIRECTORY + "group_feature.pkl")
-        cluster_table = pd.read_pickle(PROCESSED_DIRECTORY + cluster_method + "_cluster_feature.pkl")
-
-
+        cluster_table = pd.read_pickle(PROCESSED_DIRECTORY + table_method + "_" + cluster_method + "_cluster_feature.pkl")
     else:
-        group_table = pd.read_pickle(DEFAULT_DATA + "group_feature.pkl")
-        if cluster_method == "km":
-            cluster_table = pd.read_pickle(DEFAULT_DATA + "km_cluster_feature.pkl")
-        else:
-            cluster_table = pd.read_pickle(DEFAULT_DATA + "db_cluster_feature.pkl")
-
-        # table
+        group_table, _  = get_data(n_click, "group_feature", False)
+        cluster_table, _ = get_data(n_click, cluster_method + "_cluster_feature", False)
+    
+    print(group_table)
+    print(cluster_table)
     if len(group_table) == 0:
         table1 = "No Semantics Didentifier"
     else:
         table1=dbc.Table.from_dataframe(group_table, striped=True, bordered=True, hover=True)
-
 
     if len(cluster_table) == 0:
         table2 = "No Cluster Didentifier"
