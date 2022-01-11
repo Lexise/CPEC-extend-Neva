@@ -1,7 +1,6 @@
 import dash
 import re
 import time
-import seaborn as sns
 import base64
 import dash_core_components as dcc
 import dash_bootstrap_components as dbc
@@ -17,17 +16,11 @@ from zipfile import ZipFile
 from urllib.parse import quote as urlquote
 from file_manage import uploaded_files,get_current_processed_dir_semantic, save_file, clean_folder
 from control import WELL_COLOR_new
-from dash import dash_table
-from ctypes import c_char_p
 import plotly.graph_objects as go
 from flask_caching import Cache
-from flask import Flask, send_from_directory, request
+from flask import send_from_directory, request
 from clustering_correlation import compute_serial_matrix,innovative_correlation_clustering,my_optimal_leaf_ordering,abs_optimal_leaf_ordering
 import numpy as np
-# from process_data import process_data,clean_folder,get_color_label, find_feature_group, process_data_two_sets,\
-#     addional_process_individual, process_extension_individual,get_colors,find_semantic_files,get_catogery,initial_process_individual
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-import copy
 from dash.dependencies import Input, Output, State, ClientsideFunction
 from flask_caching import Cache
 import pathlib
@@ -50,10 +43,6 @@ if not os.path.exists(CACHE_DIRECTORY):
     os.makedirs(CACHE_DIRECTORY)
 if not os.path.exists(ZIP_DIRECTORY):
     os.makedirs(ZIP_DIRECTORY)
-
-#from subprocess import Popen, PIPE
-# p = os.popen('ls -la')
-# print(p.read())
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP],meta_tags=[{"name": "viewport", "content": "width=device-width"}])
 app.scripts.config.serve_locally=True
@@ -82,24 +71,20 @@ def download(path):
 
 @server.route("/data")
 def data():
-    content = request.args['content'] if 'content' in request.args else ''
     reduction = request.args['reduction'] if 'reduction' in request.args else 'tsne' #tsne, svd, auto
     cluster_method = request.args['cluster_method'] if 'cluster_method' in request.args else 'db' #db, km
-    n_click = None
+    data, color_label = get_data()
 
-    data, color_label = get_data(n_click)
-    
     x_axe = reduction + "_position_x"
     y_axe = reduction + "_position_y"
     method = cluster_method + '_cluster_label'
-    
-    print(data.columns)
-
-    return data[[x_axe, y_axe, method, color_label]].rename(
+    data['z'] = [len(set(s)) for s in data["arg"]]
+    return data[[x_axe, y_axe, 'z', method, color_label]].rename(
         columns = {
             x_axe :'x',
             y_axe :'y',
             method : 'c',
+            color_label: 'gc'
         }).T.to_json()
 
 def get_data(n_click = None, name = "processed_data", check_combined = True):
@@ -115,9 +100,35 @@ def get_data(n_click = None, name = "processed_data", check_combined = True):
         
     return processed_data, color_label
 
+@server.route("/arguments")
+def arguments(): 
+    dataset_bar, _ = get_data(name = "bar_data")
+    dataset_bar['argument'] = dataset_bar['argument'].apply(lambda x : x.replace('argument', '')) #not sure if this is needed for uploaded data
 
+    return dataset_bar.rename(
+        columns = {
+            'argument' :'a',
+            'frequency' :'f',
+            'rate' : 'r',
+        }).T.to_json()
+
+@server.route("/correlation")
+def correlation(): 
+    matrix = request.args['matrix'] if 'matrix' in request.args else '' #hrp, r-hrp, olo, r-olo
+    x, y, z = get_correlation(matrix)
+    data = pd.DataFrame({'x': x, 'y': y, 'z': [e for e in z] })
+    data['x'] = data['x'].apply(lambda x : x.replace('arg', '')) # check if this "arg" can be removed before this
+    data['y'] = data['y'].apply(lambda x : x.replace('arg', ''))
+    
+    return data.T.to_json()
 
 app.config.suppress_callback_exceptions = True
+# Create callbacks
+app.clientside_callback(
+    ClientsideFunction(namespace="clientside", function_name="resize"),
+    Output("output-clientside", "children"),
+    [Input("bar_chart", "figure")],
+)
 
 mapbox_access_token = "pk.eyJ1IjoiamFja2x1byIsImEiOiJjajNlcnh3MzEwMHZtMzNueGw3NWw5ZXF5In0.fk8k06T96Ml9CLGgKmk81w"
 layout = dict(
@@ -138,17 +149,17 @@ layout = dict(
         zoom=8,
     ),
     xaxis=dict(
-            autorange=True,
-            showgrid=False,
-            ticks='',
-            showticklabels=False
-        ),
+        autorange=True,
+        showgrid=False,
+        ticks='',
+        showticklabels=False
+    ),
     yaxis=dict(
-            autorange=True,
-            showgrid=False,
-            ticks='',
-            showticklabels=False
-        )
+        autorange=True,
+        showgrid=False,
+        ticks='',
+        showticklabels=False
+    )
 )
 
 if len(os.listdir(PROCESSED_DIRECTORY))==12:
@@ -177,128 +188,63 @@ def get_file_name(dir):
 argument_analysis=html.Div([
 
     dcc.Link(html.Button('back'), href='/'),
-    html.Div(
-        [
-            html.Div(
-                [
-                    # html.H4(
-                    #     "select range in histogram:",
-                    #     className="control_label",
-                    # ),
-                    # dcc.RangeSlider(
-                    #     id='my-range-slider',
-                    #     min=0,
-                    #     max=len(dataset_all),
-                    #     step=1,
-                    #     value=[5, int(0.5*len(dataset_all))]
-                    # ),
-
-
-                    html.P("Presented data:", style={"fontWeight": "bold"},className="control_label"),
-                    dcc.RadioItems(
-                        id="data_present_selector",
-                        options=[
-                            {"label": "All ", "value": "all"},
-                            {"label": "Interesting", "value": "interesting"},
-                        ],
-                        value="all",
-                        labelStyle={"display": "inline-block"},
-                        className="dcc_control",
-                    ),
-
-                    dcc.Checklist(
-                        id="sort_selector",
-                        options=[{"label": "descending order", "value": "decreased"}],
-                        className="dcc_control",
-                        value=["decreased"],
-                    ),
-
-
-                    html.P("Cluster Algorithm:", style={"fontWeight": "bold"}, className="control_label"),
-                    dcc.RadioItems(
-                        id="clustering-method",
-                        options=[
-                            {"label": "DBscan ", "value": "db"},
-                            {"label": "Kmeans", "value": "km"},
-                        ],
-                        labelStyle={"display": "inline-block"},
-                        value="db",
-                        className="dcc_control",
-                    ),
-
-
-                    html.Div(
-                        [html.H5(id="selected_cluster")],
-                        id="selected argument",
-                        className="dcc_control",
-                        # className="mini_container",
-                    ),
-                    # html.Div(
-                    #     id="card-1",
-                    #     children=[
-                    #
-                    #         daq.LEDDisplay(
-                    #             id="stable",
-                    #             value="04",
-                    #             color="#92e0d3",
-                    #             backgroundColor="#FFFF",
-                    #             size=50,
-                    #         ),
-                    #        daq.LEDDisplay(
-                    #             id="prefer",
-                    #             value="17",
-                    #             color="#92e0d3",
-                    #             backgroundColor="#FFFF",
-                    #             size=50,
-                    #         ),
-                    #     ],
-                    #     className="row container-display",
-                    # ),
-
-
-
-                    html.Div(
-                        #[
-                            # html.Div(
-                            #     [html.H6(id="stable"), html.P("Stable")],
-                            #     id="stable_block",
-                            #     className="mini_container",
-                            # ),
-                            # html.Div(
-                            #     [html.H6(id="prefer"), html.P("Preferred")],
-                            #     id="prefer_block",
-                            #     className="mini_container",
-                            #
-                            # ),
-                            # html.Div(
-                            #     [html.H6(id="stage"), html.P("Stage")],
-                            #     id="stage_block",
-                            #     className="mini_container",
-                            # ),
-
-                        #],
-                        id="info-container",
-                        className="row container-display"
-                    )
-
+    html.Div([
+        html.Div([
+            html.P("Presented data:", style={"fontWeight": "bold"},className="control_label"),
+            dcc.RadioItems(
+                id="data_present_selector",
+                options=[
+                    {"label": "All ", "value": "all"},
+                    {"label": "Interesting", "value": "interesting"},
                 ],
-                className="pretty_container four columns",
-                id="cross-filter-options",
+                value="all",
+                labelStyle={"display": "inline-block"},
+                className="dcc_control",
             ),
-            html.Div([dcc.Graph(id="bar_chart"),
-                      dcc.RangeSlider(
-                          id='my-range-slider',
-                          min=0,
-                          max=len(dataset_all),
-                          step=1,
-                          value=[int(0.2 * len(dataset_all)), int(0.5 * len(dataset_all))]
-                      ),
-                      ],
-                     className="pretty_container seven columns",
-                     style={'width': '64%'}),
 
-        ],
+            dcc.Checklist(
+                id="sort_selector",
+                options=[{"label": "descending order", "value": "decreased"}],
+                className="dcc_control",
+                value=["decreased"],
+            ),
 
+            html.P("Cluster Algorithm:", style={"fontWeight": "bold"}, className="control_label"),
+            dcc.RadioItems(
+                id="clustering-method",
+                options=[
+                    {"label": "DBscan ", "value": "db"},
+                    {"label": "Kmeans", "value": "km"},
+                ],
+                labelStyle={"display": "inline-block"},
+                value="db",
+                className="dcc_control",
+            ),
+            html.Div(
+                [html.H5(id="selected_cluster")],
+                id="selected argument",
+                className="dcc_control",
+                # className="mini_container",
+            ),
+            html.Div(
+                id="info-container",
+                className="row container-display"
+            )],
+            className="pretty_container four columns",
+            id="cross-filter-options",
+        ),
+        html.Div([
+            dcc.Graph(id="bar_chart"),
+            dcc.RangeSlider(
+                id='my-range-slider',
+                min=0,
+                max=len(dataset_all),
+                step=1,
+                value=[int(0.2 * len(dataset_all)), int(0.5 * len(dataset_all))]
+            ),],
+            className="pretty_container seven columns",
+            style={'width': '64%'}
+        ),],
         className="row flex-display",
     ),
     html.Div([
@@ -306,15 +252,13 @@ argument_analysis=html.Div([
             id="loading-1",
             type="default",
             children=html.Div(id="basic-interactions"),
-        )
-    ],
-    className="row",
+        )],
+        className="row",
     ),
     html.Div([
         html.Div([
-        dcc.Graph(
-            id='basic-interactions'),
-        dcc.RadioItems(
+            dcc.Graph(id='basic-interactions'),
+            dcc.RadioItems(
                 id="argument-dimensional-reduction",
                 options=[
                     {"label": "Tsne ", "value": "tsne"},
@@ -324,106 +268,67 @@ argument_analysis=html.Div([
                 value="tsne",
                 labelStyle={"display": "inline-block"},
                 className="dcc_control",
-            ),
-        ],
-        className="pretty_container seven columns"
+            ),],
+            className="pretty_container seven columns"
         ),
 
         html.Div(
             [dcc.Graph(id="pie_graph")],
             className="pretty_container five columns",
-        ),
-
-
-
-    ],
-    className = "row flex-display",
-    ),
-    # html.Div(
-    #     [
-    #         html.Br(),
-
-    #     className="row flex-display",
-    # ),
-    ],
+        ),],
+        className = "row flex-display",
+    ),],
 )
 
 correlation_page= html.Div([
     dcc.Link(html.Button('back'), href='/'),
     html.Div([
-
-    dcc.Graph(
-        id="correlation_hm"
-        ),
-    html.Div([
-        html.Button('HRP',
-                    style={'fontSize': '14px','marginLeft': '2%', 'marginRight': '2%',"color": "#FFFF", "backgroundColor": "#2F8FD2"},
-                    id='btn-nclicks-1', n_clicks=0),
-        html.Button('Revised HRP',
-                    style={'fontSize': '14px', 'marginRight': '2%',"color": "#FFFF", "backgroundColor": "#2F8FD2"},
-                    id='btn-nclicks-2', n_clicks=0),
-        html.Button('OLO',
-                    style={'fontSize': '14px', 'marginRight': '2%',"color": "#FFFF", "backgroundColor": "#2F8FD2"},
-                    id='btn-nclicks-3', n_clicks=0),
-        html.Button('Revised OLO',
-                    style={'fontSize': '14px', 'marginRight': '2%',"color": "#FFFF", "backgroundColor": "#2F8FD2"},
-                    id='btn-nclicks-4', n_clicks=0),
-        # html.P("Presented semantic extension:", style={"fontWeight": "bold"}, className="dcc_control"),
-        #
-        # dcc.RadioItems(
-        #     id="data_semantic_correlation",
-        #     loading_state={"is_loading":True},
-        #     options=[
-        #         {"label": "Preferred ", "value": "pr"},
-        #         {"label": "Stage", "value": "stg"},
-        #     ],
-        #     value="pr",
-        #     labelStyle={"display": "inline-block"},
-        #     className="dcc_control",
-        # ),
-        ],
-        className="row flex-display"
-    )
-
-    ],
-    className="pretty_container")
-    ]
+        dcc.Graph(id="correlation_hm"),
+        html.Div([
+            html.Button('HRP',
+                        style={'fontSize': '14px','marginLeft': '2%', 'marginRight': '2%',"color": "#FFFF", "backgroundColor": "#2F8FD2"},
+                        id='btn-nclicks-1', n_clicks=0),
+            html.Button('Revised HRP',
+                        style={'fontSize': '14px', 'marginRight': '2%',"color": "#FFFF", "backgroundColor": "#2F8FD2"},
+                        id='btn-nclicks-2', n_clicks=0),
+            html.Button('OLO',
+                        style={'fontSize': '14px', 'marginRight': '2%',"color": "#FFFF", "backgroundColor": "#2F8FD2"},
+                        id='btn-nclicks-3', n_clicks=0),
+            html.Button('Revised OLO',
+                        style={'fontSize': '14px', 'marginRight': '2%',"color": "#FFFF", "backgroundColor": "#2F8FD2"},
+                        id='btn-nclicks-4', n_clicks=0),],
+            className="row flex-display"
+        )],
+        className="pretty_container"
+    )]
 )
 
 main_page = html.Div([
-
-
-        # empty Div to trigger javascript file for graph resizing
+    # empty Div to trigger javascript file for graph resizing
     html.Div(id="output-clientside"),
     html.Div([
         dcc.Dropdown(
             id='visual-dropdown',
             options=[
-                {'label': 'new processing', 'value': 'upload-user'},
-                {'label': 'two dimension', 'value': 'dropdown-2d'},
-                {'label': 'three dimension', 'value': 'dropdown-3d'},
-
+                {'label': 'new', 'value': 'upload-user'},
+                {'label': '2D', 'value': 'dropdown-2d'},
+                {'label': '3D', 'value': 'dropdown-3d'},
             ],
             value='upload-user',
             style={'fontSize': '14px', 'width': '150px','marginLeft': '2%'}
         ),
 
-        #html.Br(),
-        dcc.Link(html.Button('Argument Analysis',
-                             style={'marginLeft': '4%','marginRight': '8px','width': '300px', 'fontSize': '14px', "color": "#FFFF", "backgroundColor": "#2F8FD2"}),
-                 href='/page-argument'),
+        dcc.Link(
+            html.Button('Argument Analysis', style={'marginLeft': '4%','marginRight': '8px','width': '300px', 'fontSize': '14px', "color": "#FFFF", "backgroundColor": "#2F8FD2"}),
+            href='/page-argument'
+        ),
 
-        # dcc.Link(html.Button('3D Analysis',style={'marginLeft': '2%','width': '32%','fontSize':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}), href='/page-3d'),
-        dcc.Link(html.Button('Correlation Matrix',
-                             style={'marginLeft': '4%', 'width': '300px', 'fontSize': '14px', "color": "#FFFF",
-                                    "backgroundColor": "#2F8FD2"}), href='/page-correlation'),
-    #html.Hr(),
-    ],
-    className="row flex-display",
+        dcc.Link(
+            html.Button('Correlation Matrix', style={'marginLeft': '4%', 'width': '300px', 'fontSize': '14px', "color": "#FFFF","backgroundColor": "#2F8FD2"}), 
+            href='/page-correlation'
+        ),],
+        className="row flex-display",
     ),
-
-
-
 
     html.Div([
         html.Div([ dcc.Graph( id="scatter_groups",style={'display':'none'}) ], className="bare_container"),
@@ -439,77 +344,73 @@ main_page = html.Div([
                 'margin': '12px',
                 'padding': '17px'
             }
-        ),
+        ),], className="row flex-display",
+    ),
 
-        ], className="row flex-display",
-        ),
-
-
-
+    html.Div([
         html.Div([
-            html.Div([
-                html.Span("Semantics:", style={"marginTop": "5%","fontWeight": "bold"}),
-                dcc.RadioItems(
-                    id="semantic-method-1",
-                    options=[
-                        {"label": processed_semantics[0], "value": processed_semantics[0]},
-                        {"label": processed_semantics[1], "value": processed_semantics[1]},
-                    ],
-                    labelStyle={"display": "inline-block"},
-                    value=processed_semantics[0],
-                )],
-                id="semantic-method",
-                style={'marginLeft': '2%', 'width': '18%'},
+            html.Span("Semantics:", style={"marginTop": "5%","fontWeight": "bold"}),
+            dcc.RadioItems(
+                id="semantic-method-1",
+                options=[
+                    {"label": processed_semantics[0], "value": processed_semantics[0]},
+                    {"label": processed_semantics[1], "value": processed_semantics[1]},
+                ],
+                labelStyle={"display": "inline-block"},
+                value=processed_semantics[0],
+            )],
+            id="semantic-method",
+            style={'marginLeft': '2%', 'width': '18%'},
+        ),
+        html.Div(children=[
+            html.Span("Dimensional Reduction:", style={"fontWeight": "bold"}),
+            dcc.RadioItems(
+                id="dimensional-reduction1",
+                options=[
+                    {"label": "Tsne ", "value": "tsne"},
+                    {"label": "SVD", "value": "svd"},
+                    {"label": "AutoEncode", "value": "auto"},
+                ],
+                labelStyle={"display": "inline-block"},
+                value="tsne",
             ),
-            html.Div(children=[
-                html.Span("Dimensional Reduction:", style={"fontWeight": "bold"}),
-                dcc.RadioItems(
-                    id="dimensional-reduction1",
-                    options=[
-                        {"label": "Tsne ", "value": "tsne"},
-                        {"label": "SVD", "value": "svd"},
-                        {"label": "AutoEncode", "value": "auto"},
-                    ],
-                    labelStyle={"display": "inline-block"},
-                    value="tsne",
-                ),
-            ],
-                style={'marginLeft': '2%', 'width': '18%'},
+        ],
+            style={'marginLeft': '2%', 'width': '18%'},
 
-            ),
+        ),
 
-            html.Div(
-                     [
-                html.Span("Cluster Algorithm:", style={"fontWeight": "bold"}),
-                dcc.RadioItems(
-                    id="clustering-method",
-                    options=[
-                        {"label": "DBscan ", "value": "db"},
-                        {"label": "Kmeans", "value": "km"},
-                    ],
-                    labelStyle={"display": "inline-block"},
-                    value="db",
-                )],
+        html.Div(
+                    [
+            html.Span("Cluster Algorithm:", style={"fontWeight": "bold"}),
+            dcc.RadioItems(
+                id="clustering-method",
+                options=[
+                    {"label": "DBscan ", "value": "db"},
+                    {"label": "Kmeans", "value": "km"},
+                ],
+                labelStyle={"display": "inline-block"},
+                value="db",
+            )],
 
-                style={'marginLeft': '2%', 'width': '18%'},
-            ),
+            style={'marginLeft': '2%', 'width': '18%'},
+        ),
 
-            html.Button(id='feature_semantic', children='semantics identifier',className='middle-button',
-                        style={'marginTop':'0.5%','fontSize': '14px', "color": "#000000", "backgroundColor": "#f0f0f0"}),
-            dbc.Tooltip(
+        html.Button(id='feature_semantic', children='semantics identifier',className='middle-button',
+                    style={'marginTop':'0.5%','fontSize': '14px', "color": "#000000", "backgroundColor": "#f0f0f0"}),
+        dbc.Tooltip(
 
-                id='feature_semantic_table',
-                target="feature_semantic",
-                style ={'fontSize': '11px',"color": "#000000", "backgroundColor": "#f0f0f0"}
-            ),
-            html.Button(id='feature_cluster', children='clusters identifier',className='middle-button',
-                        style={'marginTop':'0.5%','fontSize': '14px','marginLeft': '3%', "color": "#000000", "backgroundColor": "#f0f0f0"}),#'marginTop':'1%',
+            id='feature_semantic_table',
+            target="feature_semantic",
+            style ={'fontSize': '11px',"color": "#000000", "backgroundColor": "#f0f0f0"}
+        ),
+        html.Button(id='feature_cluster', children='clusters identifier',className='middle-button',
+                    style={'marginTop':'0.5%','fontSize': '14px','marginLeft': '3%', "color": "#000000", "backgroundColor": "#f0f0f0"}),#'marginTop':'1%',
 
-            dbc.Tooltip(
-                id='feature_cluster_table',
-                target="feature_cluster",
-                style={'fontSize': '11px', "color": "#000000", "backgroundColor": "#f0f0f0"}
-            ),
+        dbc.Tooltip(
+            id='feature_cluster_table',
+            target="feature_cluster",
+            style={'fontSize': '11px', "color": "#000000", "backgroundColor": "#f0f0f0"}
+        ),
 
 
 
@@ -517,140 +418,117 @@ main_page = html.Div([
             id='options-visualization',
             style={'display':'none'},
             className="row flex-display"
-        ),
+    ),
 
-        html.Div(id='hover-data'),
-        html.Div([
+    html.Div(id='hover-data'),
+    html.Div([
         dcc.Tabs([
 
             dcc.Tab(label='UPLOAD', children=[
-                html.Div(
-                    [
+                html.Div([
                     html.Div([
                         dcc.Upload([html.Button(children='UPLOAD APX', id="upload_button")], id="upload-data", multiple=True),
                         dcc.Upload([html.Button(children='UPLOAD Extensions', id="upload_ex_button")], id="upload-ex-data", multiple=True),
                     ],
                     className = "row flex-display"),
                     html.Div([
+                        html.Div([
+                            html.P("Uploaded",className="dcc_control",style={"width":"80%",'textAlign': 'left'}),
+                            html.Button(id='clear-upload', n_clicks=0, children='Clear',style={'fontSize':'11px','textAlign': 'left','marginRight': '1%'}),],
+                            className = "row flex-display"
+                        ),
 
-
-                        html.Div([html.P("Uploaded",className="dcc_control",style={"width":"80%",'textAlign': 'left'}),
-                        html.Button(id='clear-upload', n_clicks=0, children='Clear',style={'fontSize':'11px','textAlign': 'left','marginRight': '1%'}),
-                        ],
-                        className = "row flex-display"   ),
-
-                        html.Ul(id="file-list", children=get_file_name(UPLOAD_DIRECTORY))
-                        ],
-                    className="pretty_container",),
-
-                    #style={'borderRadius': '15px'}),
-                     ],
-                className ='empty_container six columns',
+                        html.Ul(
+                            id="file-list", 
+                            children=get_file_name(UPLOAD_DIRECTORY))],
+                            className="pretty_container",
+                    ),],
+                    className ='empty_container six columns',
                 ),
                 dcc.ConfirmDialog(
-                        id='stop_confirm',
-                        message='the corresponding extension size exceed our limitation (1G)',
-                    ),
-                html.Div([
-                    html.Div(
-                        [
-                    html.Span("Semantics:", style={"fontWeight": "bold",'marginRight': '1%','marginLeft': '0.5%'}),
-
-
-                    dcc.Dropdown(
-                    id="check_semantics",
-                    options=[
-                        {'label': 'Preferred and Stable', 'value': 'preferred_stable'},
-                        {'label': 'Stable and Stage', 'value': 'stable_stage'},
-                        #{'label': 'Stable and Stage2', 'value': 'stage2_stable'},
-                        {'label': 'Stable and CF2', 'value': 'stable_cf2'},
-                        #{'label': 'Stage2 and CF2', 'value': 'cf2_stage2'},
-                        #{'label':"Semi-Stable and Preferred", 'value':'semi-stable_preferred'},
-                        {'label':"Others", 'value':'others'}
-                    ],
-                    #value=['preferred_stable'],
-                    placeholder="Select semantics pair",
-                    style={'height': '30px', 'width': '200px'}
-                    ) ,
-                    dcc.Store(id='memory-semantic'),
-                    #     ],
-                    # style={"width": "17%"},
-                    # ),
-                    html.Div(
-                        [
-         
-
-                    dcc.Dropdown(
-                        id="check_semantics2",
-                        options=[
-                            {'label': 'Preferred ', 'value': 'preferred'},
-                            {'label': 'Stable', 'value': 'stable'},
-                            {'label': 'Stage', 'value': 'stage'},
-                            #{'label': 'Stage2', 'value': 'stage2'},
-                            {'label': 'CF2', 'value': 'cf2'},
-                            {'label': "Semi-Stable", 'value': 'semi-stable'}
-                        ],
-                        placeholder="Select Semantics",
-                        #value=['MTL', 'NYC'],
-                        multi=True,
-                        style={'height': '30px', 'width': '200px'}
-                    )
-
-                        ],
-                    id="check_semantics2_style",
-
-                    style={"display": "none"},
-                    ),
-                    dcc.Checklist(
-                        id="default_params",
-                        options=[{"label": "use suggested parameters", "value": "use_bo"}],
-                        className="dcc_control",
-                        value=[],
-                        style={'height': '50px', 'marginLeft': '1.5%'}
-                    ),
-                    # html.Abbr("\u003F", title="Hello, I am hover-enabled helpful information.")
-                    html.Span(
-                        "?",
-                        id="tooltip-target",
-                        style={
-                            "textAlign": "center",
-                            "color": "white"
-                        },
-                        className="dot"),
-
-                    dbc.Tooltip(
-                        "use Bayesian Optimization to find suitable clustering parameters (Eps, MinPts, Cluster Num)",
-                        target="tooltip-target",)
-                        ],
-                className="row flex-display"
+                    id='stop_confirm',
+                    message='the corresponding extension size exceed our limitation (1G)',
                 ),
-                dbc.Tooltip(
-                    "you can choose one or two semantics",
-                    target="check_semantics2_style"),
-
-                dcc.Store(id="store-prev-comparisons"),
-                html.Br(),
                 html.Div([
-                    html.P("Eps:", style={"fontWeight": "bold"}, className="dcc_control"),
-                    dcc.Input(id='eps', type="number", placeholder="input eps",disabled=False, style={'width': '22%','marginRight': '4%'}),
-                    dbc.Tooltip("DBscan  parameter, specifies the distance between two points to be considered within one cluster.suggested a decimal in range[1,3]", target="eps"),
-                    html.P("MinPts:", style={"fontWeight": "bold"}, className="dcc_control"),
-                    dcc.Input(id='minpts',  type="number", placeholder="input minpts",disabled=False,style={'width': '22%'}),#style={'width': '10%','marginRight': '0.5%'}
-                    dbc.Tooltip("DBscan parameter, the minimum number of points to form a cluster. suggested an integer in range[3,15]", target="minpts"),
-                ],
+                    html.Div([
+                        html.Span("Semantics:", style={"fontWeight": "bold",'marginRight': '1%','marginLeft': '0.5%'}),
+                        dcc.Dropdown(
+                            id="check_semantics",
+                            options=[
+                                {'label': 'Preferred and Stable', 'value': 'preferred_stable'},
+                                {'label': 'Stable and Stage', 'value': 'stable_stage'},
+                                {'label': 'Stable and CF2', 'value': 'stable_cf2'},
+                                {'label':"Others", 'value':'others'}
+                            ],
+                            placeholder="Select semantics pair",
+                            style={'height': '30px', 'width': '200px'}
+                        ),
+                        dcc.Store(id='memory-semantic'),
+                        html.Div([
+                            dcc.Dropdown(
+                                id="check_semantics2",
+                                options=[
+                                    {'label': 'Preferred ', 'value': 'preferred'},
+                                    {'label': 'Stable', 'value': 'stable'},
+                                    {'label': 'Stage', 'value': 'stage'},
+                                    {'label': 'CF2', 'value': 'cf2'},
+                                    {'label': "Semi-Stable", 'value': 'semi-stable'}
+                                ],
+                                placeholder="Select Semantics",
+                                multi=True,
+                                style={'height': '30px', 'width': '200px'}
+                            )],
+                            id="check_semantics2_style",
 
-                className="row flex-display"),
-                html.Br(),
-                html.Div([
-                    html.P("Cluster Num", style={"fontWeight": "bold"}, className="dcc_control"),
-                    dcc.Input(id='cluster_num', type="number", placeholder="input cluster num",disabled=False),
-                    dbc.Tooltip("Kmeans parameter, number of clusters, suggested an integer in range[2,15]", target="cluster_num"),
-                ],
-                className="row flex-display"),
-                html.Button(id='submit-button-state', n_clicks=0, children='Submit',className="middle-button",style={'fontSize':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"})],
+                            style={"display": "none"},
+                        ),
+                        dcc.Checklist(
+                            id="default_params",
+                            options=[{"label": "use suggested parameters", "value": "use_bo"}],
+                            className="dcc_control",
+                            value=[],
+                            style={'height': '50px', 'marginLeft': '1.5%'}
+                        ),
+                        html.Span(
+                            "?",
+                            id="tooltip-target",
+                            style={
+                                "textAlign": "center",
+                                "color": "white"
+                            },
+                            className="dot"
+                        ),
+                        dbc.Tooltip(
+                            "use Bayesian Optimization to find suitable clustering parameters (Eps, MinPts, Cluster Num)",
+                            target="tooltip-target",
+                        )],
+                        className="row flex-display"
+                    ),
+                    dbc.Tooltip(
+                        "you can choose one or two semantics",
+                        target="check_semantics2_style"
+                    ),
+
+                    dcc.Store(id="store-prev-comparisons"),
+                    html.Br(),
+                    html.Div([
+                        html.P("Eps:", style={"fontWeight": "bold"}, className="dcc_control"),
+                        dcc.Input(id='eps', type="number", placeholder="input eps",disabled=False, style={'width': '22%','marginRight': '4%'}),
+                        dbc.Tooltip("DBscan  parameter, specifies the distance between two points to be considered within one cluster.suggested a decimal in range[1,3]", target="eps"),
+                        html.P("MinPts:", style={"fontWeight": "bold"}, className="dcc_control"),
+                        dcc.Input(id='minpts',  type="number", placeholder="input minpts",disabled=False,style={'width': '22%'}),#style={'width': '10%','marginRight': '0.5%'}
+                        dbc.Tooltip("DBscan parameter, the minimum number of points to form a cluster. suggested an integer in range[3,15]", target="minpts"),],
+                        className="row flex-display"
+                    ),
+                    html.Br(),
+                    html.Div([
+                        html.P("Cluster Num", style={"fontWeight": "bold"}, className="dcc_control"),
+                        dcc.Input(id='cluster_num', type="number", placeholder="input cluster num",disabled=False),
+                        dbc.Tooltip("Kmeans parameter, number of clusters, suggested an integer in range[2,15]", target="cluster_num"),],
+                        className="row flex-display"
+                    ),
+                    html.Button(id='submit-button-state', n_clicks=0, children='Submit',className="middle-button",style={'fontSize':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"})],
                     className="empty_container five columns",
-
-                #className="pretty_container five columns",) style={'width': '32%','fontSize':'14px',"color":"#FFFF","backgroundColor":"#2F8FD2"}
                 )
             ],
             className="row flex-display"
@@ -659,51 +537,35 @@ main_page = html.Div([
             dcc.Tab(label='PROCESSED', children=[
 
                 html.Div([
-                            html.P("Derived Extensions"),
-                            html.Ul(id="extension-list", children=get_file_name(EXTENSION_DIR),style={'height':350,'overflowX':'scroll'}),
-                            #html.Pre(id='hover-data', children=get_file_name(EXTENSION_DIR),style=styles['pre'])
-                        ],
-                            className="pretty_container four columns"),
+                    html.P("Derived Extensions"),
+                    html.Ul(id="extension-list", children=get_file_name(EXTENSION_DIR),style={'height':350,'overflowX':'scroll'}),],
+                    className="pretty_container four columns"
+                ),
                 html.Div([
-                            html.P("Processed Documents"),
-                            html.Ul(id="processed-list", children=get_file_name(ZIP_DIRECTORY),style={'height':350,'overflowX':'scroll'})
-                        ],
-                            className="pretty_container four columns"),
-
-
-
-                html.Div(
-                [
-                    # html.Div(
-                    #     [
+                    html.P("Processed Documents"),
+                    html.Ul(id="processed-list", children=get_file_name(ZIP_DIRECTORY),style={'height':350,'overflowX':'scroll'})],
+                    className="pretty_container four columns"
+                ),
+                html.Div([
                     html.A(
                         html.Button("Get Default Data", id="get_default_data",className="middle-button",
                                     style={"color":"#FFFF","backgroundColor":"#2F8FD2"}),
                         href="https://github.com/Lexise/ASP-Analysis/tree/master/data/default_raw_data",
                     ),
-                    #     ],
-                    #     #className="one-fifth column",
-                    #     style={'width': '15%', 'textAlign': 'left'},
-                    #     id="download_default",
-                    # ),
                     dcc.Upload([html.Button("Upload Processed Data" ,id="view_button",className="middle-button")],id="view-processed-button",multiple=True),
 
                     dcc.ConfirmDialog(
                         id='confirm',
                         message='Do you want to visualize uploaded data?',
                     ),
-                    html.Div(id='hidden-div', style={'display':'none'})
-                    #html.A('Refresh', href='/')
-                ],
-                className="one-fifth column",
-                #style={'width': '15%', 'textAlign': 'right'},
-                id="button",
-                ),
-             ],
-             className="row flex-display"       ),
-
-
-        ]),
+                    html.Div(id='hidden-div', style={'display':'none'})                    
+                    ],
+                    className="one-fifth column",
+                    id="button",
+                ),],
+                className="row flex-display"
+            ),]
+        ),
 
         html.Div([
             html.Br(),
@@ -718,84 +580,24 @@ main_page = html.Div([
                 multi=True,
             )],
 
-        )
-
-        ],
+        )],
         id="upload_block",
-        #style={'display':'none'},
         className="my_container"
-        ),
-
-        ],
+    ),],
     className='my_main_container',
-    #style={'height': '100%'}
-)
-
-ThreeD_analysis = html.Div([
-    dcc.Link(html.Button('back'), href='/'),
-    # html.Div([
-    #     dcc.Graph(id="3d_scatter_cluster",className="row flex-display"),
-    #     dcc.Graph(id="3d_scatter_group", className="row flex-display"),
-    #     ],
-    #     className="row flex-display"
-    # ),
-    html.Div([
-
-        html.Div([
-                    html.P("Dimensional Reduction Method:", style={"fontWeight": "bold"},className="dcc_control"),
-                    dcc.RadioItems(
-                        id="reduction_method",
-                        options=[
-                            {"label": "Tsne ", "value": "tsne"},
-                            {"label": "SVD", "value": "svd"},
-                            {"label": "AutoEncode", "value": "auto"},
-                        ],
-                        labelStyle={"display": "inline-block"},
-                        value="tsne",
-                        className="dcc_control",
-                )],
-                style={'marginRight': '2%', 'width': '30%'},
-                className="row flex-display"
-        ),
-        html.Div([
-                    html.P("Cluster Algorithm:", style={"fontWeight": "bold"}, className="dcc_control"),
-                    dcc.RadioItems(
-                        id="clustering-method",
-                        options=[
-                            {"label": "DBscan ", "value": "db"},
-                            {"label": "Kmeans", "value": "km"},
-                        ],
-                        labelStyle={"display": "inline-block"},
-                        value="db",
-                        className="dcc_control",
-                    )],
-
-            style={ 'width': '30%'},
-            className="row flex-display"
-            )
-
-        ],
-        className = "row flex-display"),
-    ],
 )
 
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
     html.Div(id='page-content'),
-    # hidden signal value
-    #html.Div(id='signal', style={'display': 'none'}),
+    # hidden signal value: html.Div(id='signal', style={'display': 'none'}),
     dcc.Loading(
         id="loading-2",
         type="default",
         children=html.Div(id="signal")
-    ),
-
-    ],
-    #className='my_main_container',
-     style={'height':'100vh', 'margin':dict(l=0, r=0, b=0, t=0)}
-    #style={"display": "flex", "flex-direction": "column"},
+    ),],
+    style={'height':'100vh', 'margin':dict(l=0, r=0, b=0, t=0)}
 )
-
 
 def global_individual(eps, minpts, n_cluster, use_optim, semantics):
     files = uploaded_files(UPLOAD_DIRECTORY)
@@ -811,8 +613,6 @@ def global_individual(eps, minpts, n_cluster, use_optim, semantics):
                 apx_files.append(x)
             else:
                 extensions.append(x)
-
-
     except Exception as e:
         print(e)
         return html.Div([
@@ -938,7 +738,6 @@ def global_store(eps, minpts, n_cluster, use_optim,semantics):
         print("the form of input file is not correct.")
         return False
 
-
 @app.callback(Output('check_semantics2_style', 'style') ,[Input("check_semantics", "value")])
 def show_other_option(semantics):
     if semantics=="others":
@@ -946,8 +745,10 @@ def show_other_option(semantics):
 
     return {'display': 'none'}
 
-@app.callback([Output('signal', 'children'),Output('memory-semantic', 'data'),] ,[Input('submit-button-state', 'n_clicks'),Input("check_semantics", "value")],
-              [State("default_params", "value"),State('eps', 'value'), State('minpts', 'value'), State('cluster_num', 'value'),State('store-prev-comparisons', 'data')])
+@app.callback(
+    [Output('signal', 'children'),Output('memory-semantic', 'data'),] ,
+    [Input('submit-button-state', 'n_clicks'),Input("check_semantics", "value")],
+    [State("default_params", "value"),State('eps', 'value'), State('minpts', 'value'), State('cluster_num', 'value'),State('store-prev-comparisons', 'data')])
 def compute_value( n_clicks, semantics, use_optim, eps, minpts, n_cluster,semantics2):
     # compute value and send a signal when done
 
@@ -955,47 +756,39 @@ def compute_value( n_clicks, semantics, use_optim, eps, minpts, n_cluster,semant
         print("return no content")
         return "", None   #haven't upload data
     else:
-            if semantics=="others":
-                if semantics2 is None:
-                    raise dash.exceptions.PreventUpdate
-                return global_individual(eps, minpts, n_cluster,use_optim, semantics2), semantics2
-            if int(n_clicks)>0:
-                # if len(os.listdir(PROCESSED_DIRECTORY)) != 0:
-                #     clean_folder(PROCESSED_DIRECTORY)
+        if semantics=="others":
+            if semantics2 is None:
+                raise dash.exceptions.PreventUpdate
+            return global_individual(eps, minpts, n_cluster,use_optim, semantics2), semantics2
+        if int(n_clicks)>0:
+            return [global_store(eps, minpts, n_cluster,use_optim, semantics),semantics]
+        return "", semantics #already  process, no need to pass data again
 
-                return [global_store(eps, minpts, n_cluster,use_optim, semantics),semantics]
-            return "",semantics
-       #already  process, no need to pass data again
-    # global_store(value)
-    # return value
-
-@app.callback([Output('store-prev-comparisons', 'data')],
-                     [Input('check_semantics', 'value'),Input('check_semantics2', 'value'),Input('submit-button-state', 'n_clicks')])
+@app.callback(
+    [Output('store-prev-comparisons', 'data')],
+    [Input('check_semantics', 'value'),Input('check_semantics2', 'value'),Input('submit-button-state', 'n_clicks')])
 def select_comparison(semantic1,comparisons, submit_click):
+    if semantic1== None or submit_click==0:
+        raise dash.exceptions.PreventUpdate
+    if semantic1!='others' or comparisons is None:  # on page load
+        return dash.no_update
 
+    if len(comparisons) >2 or len(comparisons) == 2:
+        # changes store-prev-comparisons which triggers above callback
+        return comparisons[0:2],
 
-  if semantic1== None or submit_click==0:
-      raise dash.exceptions.PreventUpdate
-  if semantic1!='others' or comparisons is None:  # on page load
-      return dash.no_update
+    elif len(comparisons) ==1:
+        print("comparison:",comparisons)
+        return comparisons
 
-  if len(comparisons) >2 or len(comparisons) == 2:
-    # changes store-prev-comparisons which triggers above callback
-    return comparisons[0:2],
-
-  elif len(comparisons) ==1:
-      print("comparison:",comparisons)
-      return comparisons
-
-  else:
-    # when <= 3 don't modify store-prev-comparisons and therefore don't trigger above
-    raise dash.exceptions.PreventUpdate#dash.no_update
+    else:
+        # when <= 3 don't modify store-prev-comparisons and therefore don't trigger above
+        raise dash.exceptions.PreventUpdate#dash.no_update
 
 @app.callback(
     Output("file-list", "children"),
     [Input("clear-upload","n_clicks"), Input('signal', 'children'),Input('upload-data', 'filename'),Input('upload-ex-data', 'filename')],
-    [State('upload-data', 'contents'),State('upload-ex-data', 'contents')]
-)
+    [State('upload-data', 'contents'),State('upload-ex-data', 'contents')])
 def update_output(clear_click,children,uploaded_filenames,uploaded_ex_filenames, uploaded_file_contents,uploaded_ex_file_contents ):
     """Save uploaded files and regenerate the file list."""
     changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
@@ -1019,30 +812,18 @@ def update_output(clear_click,children,uploaded_filenames,uploaded_ex_filenames,
         FILE_LIST=[html.Li(file_download_link(filename)) for filename in files]
         return FILE_LIST
 
-# Create callbacks
-app.clientside_callback(
-    ClientsideFunction(namespace="clientside", function_name="resize"),
-    Output("output-clientside", "children"),
-    [Input("bar_chart", "figure")],
-)
-
-
-@app.callback(dash.dependencies.Output('page-content', 'children'),
-              [dash.dependencies.Input('url', 'pathname')])
+@app.callback(Output('page-content', 'children'),[Input('url', 'pathname')])
 def display_page(pathname):
     if pathname == '/page-argument':
         return argument_analysis
     elif pathname == '/page-correlation':
         return correlation_page
-    elif pathname=="/page-3d":
-        return ThreeD_analysis
     else:
         return main_page
 
-
 @app.callback(
     Output('3d_scatter_group', 'hoverData'),
-    [Input('3d_scatter_cluster', 'hoverData')]) #Input('scatter_cluster', 'hoverData'),
+    [Input('3d_scatter_cluster', 'hoverData')])
 def connect_hover(hover_data):
     changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
     if hover_data:
@@ -1059,7 +840,7 @@ def connect_hover(hover_data):
 
 @app.callback(
     Output('hover-data', 'children'),
-    [Input("visual-dropdown","value"),Input('scatter_groups', 'hoverData'),Input("clustering-method", "value"),Input('confirm', 'submit_n_clicks')]) #Input('scatter_cluster', 'hoverData'),
+    [Input("visual-dropdown","value"),Input('scatter_groups', 'hoverData'),Input("clustering-method", "value"),Input('confirm', 'submit_n_clicks')])
 def display_click_data(drop_selection, clickData2, method,n_click):
     if drop_selection and drop_selection=='upload-user':
         return None
@@ -1104,8 +885,6 @@ def display_click_data(drop_selection, clickData2, method,n_click):
             ], className = "pretty_container")
     return None
 
-
-
 @app.callback([Output("semantic-method-1", "options"), Output("semantic-method","style")], [Input("store-prev-comparisons", "data"),Input('signal', 'children') ])
 def chnage_selection(semantic_checks, signal_content):
     print("current semantics: {}".format(semantic_checks))
@@ -1126,135 +905,38 @@ def chnage_selection(semantic_checks, signal_content):
 
     return [],{"display": "none"}
 
-@app.callback(Output('scatter_cluster', 'figure'),
-                [ Input('signal', 'children'),Input("dimensional-reduction1", "value"),
-                Input("clustering-method", "value"),  Input('confirm', 'submit_n_clicks'), Input('memory-semantic', 'data'), Input("semantic-method-1",'value')])
-
-def generate_tabs1( content, reduction1,  method, n_click,semantic, present_semantic):#processed_data, table1_data,table2_data ):
-    try:
-        processed_data, _ = get_data(n_click)
-
-        if reduction1=="svd":
-            x_axe="svd_position_x"
-            y_axe="svd_position_y"
-        elif reduction1=="tsne":
-            x_axe = "tsne_position_x"
-            y_axe = "tsne_position_y"
-        else:
-            x_axe = "auto_position_x"
-            y_axe = "auto_position_y"
-
-        cluster_label = method + "_cluster_label"
-
-        inputdata=processed_data.copy()
-        inputdata[cluster_label]=["Cluster "+str(a) for a in processed_data[cluster_label]]
-        cluster_set = list(processed_data[cluster_label].unique())
-        if len(cluster_set)<=52:
-            temp = [100 if x == -1 else None for x in cluster_set]
-
-            clusters_symbol=temp
-        else:
-            clusters_symbol=[None]*len(cluster_set)
-
-        #let hover on the plot directly
-        # figure1 = px.scatter(inputdata, x=x_axe, y=y_axe,  color=cluster_label, symbol=clusters_symbol,#symbol_sequence =[102]*len(inputdata),
-        #                      hover_name=cluster_label,  hover_data={
-        #                                                              x_axe:False, # remove species from hover data
-        #                                                               y_axe: False,
-        #                                                               cluster_label:False,
-        #                                                              'id':True,
-        #                                                              'arg':True, # add other column, default formatting
-        #                                                              'groups':True, # add other column, customized formatting
-        #                                                             }
-        #                      )
-        # #figure1.update_traces() #remove hover  hovertemplate=None,
-        # figure1.update_xaxes(showgrid=False,visible=False,zerolinecolor="Black")
-        # figure1.update_yaxes(showgrid=False,zeroline=True,visible=False,zerolinecolor="black")
-        # figure1.update_layout(  clickmode='event+select', plot_bgcolor='rgba(0,0,0,0)',legend_title_text='',autosize=True)
-        # figure1 = go.Figure(figure1)
-
-        #remove hover, provide an extra table to show the arg information of selected data point
-
-        fig = go.Figure()
-        for x in cluster_set:
-            fig.add_trace(go.Scatter(
-                x=processed_data[processed_data[cluster_label]==x][x_axe],
-                y=processed_data[processed_data[cluster_label]==x][y_axe],
-                customdata=processed_data[processed_data[cluster_label]==x]["id"],
-                mode='markers',
-                name=str(x)+" cluster",
-                #hovertemplate='Id:%{customdata} ',
-                # hovertext=processed_data[processed_data[cluster_label]==x].arg,
-                hoverinfo="none",#'none'
-                marker=dict(
-                    symbol=clusters_symbol[x]
-                ),
-                showlegend=True
-            ))
-        fig.update_layout(xaxis={'showgrid': False,'visible': False,},
-                          yaxis={'showgrid': False, 'visible': False, },
-                          plot_bgcolor='rgba(0,0,0,0)',
-                          clickmode='event+select')
-        return fig
-    except Exception as e:
-        print(e)
-        raise dash.exceptions.PreventUpdate
-        #return dash.no_update
-    # radio_item=[
-    #             html.Span("Semantics:", style={"marginTop": "5%","fontWeight": "bold"}),
-    #             dcc.RadioItems(
-    #                 id="semantic-method-1",
-    #                 options=[
-    #                     {"label": "CF2", "value": "cf2"},
-    #                     {"label": "Stage2", "value": "stg2"},
-    #                 ],
-    #                 labelStyle={"display": "inline-block"},
-    #                 value="cf2",
-    #             )]
-
-
-@app.callback([Output('scatter_groups', 'figure'),Output('scatter_groups', 'style'),
-               Output('3d_scatter_cluster', 'figure'),Output('3d_scatter_group', 'figure'),Output('3d_scatter_cluster', 'style'),Output('3d_scatter_group', 'style'),
-               Output('upload_block','style'), Output('options-visualization','style')],
-              [Input('signal', 'children'),
-               Input('visual-dropdown', 'value'),
-               Input("semantic-method-1", "value"),
-               Input("dimensional-reduction1", "value"),
-               Input("clustering-method", "value"),
-               Input('confirm', 'submit_n_clicks')]
-               #Input('memory-semantic', 'data')],
-
-              )
-def generate_tabs(content, selected_visual, semantic, reduction2, cluster_method, n_click):
+@app.callback(
+    [
+        Output('scatter_groups', 'figure'),
+        Output('scatter_groups', 'style'), 
+        Output('3d_scatter_cluster', 'figure'), 
+        Output('3d_scatter_group', 'figure'), 
+        Output('3d_scatter_cluster', 'style'), 
+        Output('3d_scatter_group', 'style'),
+        Output('upload_block','style'), 
+        Output('options-visualization','style')
+    ], [
+        Input('visual-dropdown', 'value'), # TODO: test if [Input('memory-semantic', 'data'), Input("semantic-method-1", "value")] are also needed.
+        Input("dimensional-reduction1", "value"),
+        Input("clustering-method", "value"),
+        Input('confirm', 'submit_n_clicks')
+    ])
+def generate_tabs(selected_visual, reduction, cluster_method, n_click):
     if selected_visual=='dropdown-2d':
-        fig=generate_tabs2(reduction2, cluster_method, n_click)
-
-        print("Callback variables")
-        print(fig)
-        print("End callback variables")
+        fig=display2d(reduction, cluster_method, n_click)
         return fig,{'display':'block'},{},{},{'display':'none'},{'display':'none'},{'display':'none'},{'display':'flex','position': 'relative' }
     elif selected_visual=='dropdown-3d':
-        fig1,fig2=display3d(reduction2, semantic, cluster_method)
+        fig1,fig2=display3d(reduction, cluster_method)
         return {},{'display':'none'},fig1,fig2,{'display':'block'},{'display':'block'},{'display':'none'},{'display':'flex','position': 'relative' }
     elif selected_visual=='upload-user':
         return {},{'display':'none'},{}, {},{'display':'none'},{'display':'none'},{'display':'block'},{'display':'none'}
-    else:
-        raise dash.exceptions.PreventUpdate#return {},{'display':'none'},{}, {},{'display':'none'},{'display':'none'}
 
-
-
-# @cache.memoize(TIMEOUT)
-def generate_tabs2(reduction2, method, n_click):  # method):
-
+def display2d(reduction, method, n_click):
     processed_data, color_label = get_data(n_click)
 
-    if reduction2 == "svd":
-        x_axe = "svd_position_x"
-        y_axe = "svd_position_y"
-    else:
-        x_axe = "tsne_position_x"
-        y_axe = "tsne_position_y"
-
+    x_axe=reduction + "_position_x"
+    y_axe=reduction + "_position_y"
+        
     fig = go.Figure()
 
     # add shape (groups)
@@ -1272,21 +954,15 @@ def generate_tabs2(reduction2, method, n_click):  # method):
             marker=dict(
                 size=14,
                 color=processed_data[processed_data[color_label] == x]['color'],
-                # colorscale='Viridis',
-                # opacity=0.8
             ),
-            # marker=dict(
-            #     color=processed_data[processed_data[color_label] == x]['color'],
-            #
-            # ),
             showlegend=True
         ))
 
     # Add points
     cluster_label = method + "_cluster_label"
-    #processed_data[cluster_label] = ["Cluster " + str(a) for a in processed_data[cluster_label]]
+    # processed_data[cluster_label] = ["Cluster " + str(a) for a in processed_data[cluster_label]]
     cluster_set = list(processed_data[cluster_label].unique())
-    #    colors=get_colors(len(cluster_set))#['blue','red','green','yellow']
+    # colors=get_colors(len(cluster_set))#['blue','red','green','yellow']
     num_color=len(cluster_set)
     if num_color>8:
         colors=get_colors(len(cluster_set))#['rgb'+str(x) for x in sns.color_palette(n_colors=len(cluster_set))]
@@ -1301,41 +977,138 @@ def generate_tabs2(reduction2, method, n_click):  # method):
                 y=data[data[cluster_label] == cls][y_axe],
                 #z=[len(set(s)) for s in data[data[cluster_label] == cls]["arg"]],
                 customdata=data[data[cluster_label]==cls]['id'],
-
                 text=data[data[cluster_label] == cls].id,
                 # text=["cluster: {}".format(x) for x in data[data[cluster_label]==cls][cluster_label]],
                 mode='markers',
                 name="cluster" + str(cls + 1),
                 marker=dict(
-
                     color=cls,  # set color to an array/list of desired values
                     colorscale='Viridis',  # choose a colorscale
                     opacity=0.8,
-
                 ),
-            ))
+            )
+        )
 
-    fig.update_layout(xaxis={'showgrid': False, 'visible': False, },
-                      yaxis={'showgrid': False, 'visible': False, },
-                      plot_bgcolor='rgba(0,0,0,0)',
-                      clickmode='event+select',  # autosize=True
+    fig.update_layout(
+        xaxis={'showgrid': False, 'visible': False, },
+        yaxis={'showgrid': False, 'visible': False, },
+        plot_bgcolor='rgba(0,0,0,0)',
+        #clickmode='event+select',  # autosize=True
+        width=1500,
+        height=700,
+        autosize=False,
+        margin={'t':0,'l':0,'r':0,'b':0},
+    )
 
-                      width=1500,
-                      height=700,
-                      autosize=False,
-                      margin={'t':0,'l':0,'r':0,'b':0},
+    return fig
 
-                      )
+def display3d(reduction_method, cluster_method):
+    data, group_label = get_data()
 
+    x_axe = reduction_method + "_position_x"
+    y_axe = reduction_method + "_position_y"
 
+    cluster_label = cluster_method + "_cluster_label"
+    cluster_set = data[cluster_label].unique()
+    print('cluster selected:', cluster_label)
+    print('cluster label:', cluster_set)
+    text_list=[]
+    inputdata=data.copy()
+    for index, row in inputdata.iterrows():
+        arg_list=list(row.arg)
+        inserted_arg=[x for y in (arg_list[i:i + 6] + ["<br>"] * (i < len(arg_list) - 5) for
+                     i in range(0, len(arg_list), 6)) for x in y]
+        one_arg = str(inserted_arg).strip('[]')
+        #input_arg=f_comma(one_arg, group=20, char='<br>')
+        input_arg=one_arg.strip('"') #remove ' from string
+        text_list.append(input_arg)
 
-    return fig#, {'display': 'block'}
+    inputdata["arguments"]=text_list
+    symbols=['circle', 'square', 'cross', 'square-open', 'x','diamond', 'diamond-open', 'circle-open']
+    if len(cluster_set)<=len(symbols):
+        cluster_symbol=symbols
+    else:
+        cluster_symbol=[None]*len(cluster_set)
+    print('cluster_symbol:', cluster_symbol)
+    fig = go.Figure(
+        data=[go.Scatter3d(
+            x=data[data[cluster_label]==cls][x_axe],
+            y=data[data[cluster_label]==cls][y_axe],
+            z=[len(set(s)) for s in data[data[cluster_label]==cls]["arg"]],
+            #customdata=data[data[cluster_label]==cls]['id'],
+            customdata=['<br>'+s for s in inputdata[inputdata[cluster_label]==cls]["arguments"]],
+            hovertemplate='Id:%{text}</b><br>length:%{z} <br></b>Arguments:%{customdata} ',
+            text=data[data[cluster_label]==cls].id,
+            #text=["cluster: {}".format(x) for x in data[data[cluster_label]==cls][cluster_label]],
+            mode='markers',
+            name="cluster"+str(cls+1),
+            marker=dict(
+                size=3,
+                color=cls,  # set color to an array/list of desired values
+                colorscale='Viridis',  # choose a colorscale
+                opacity=0.8,
+                symbol=cluster_symbol[cls-1]
+            ),
 
+        ) for cls in cluster_set ],
+        layout=go.Layout(
+            title=dict(
+                text='Clusters Distribution',
+                xref="paper",
+                yref="paper",
+                #x=0.5,
+                font=dict(
+                    size=20,
+                )
+            ),
+            autosize=False,
+            width=650,
+            height=700,
+            showlegend=True,
+        )
+    )
+
+    group_set = data[group_label].unique()
+    fig2 = go.Figure(
+        data=[go.Scatter3d(
+            x=data[data[group_label] == cls][x_axe],
+            y=data[data[group_label] == cls][y_axe],
+            z=[len(set(s)) for s in data[data[group_label] == cls]["arg"]],
+            # text=["groups: {}".format(x) for x in data[data[group_label] == cls][group_label]],
+
+            customdata=['<br>' + s for s in inputdata[inputdata[group_label] == cls]["arguments"]],
+            hovertemplate='Id:%{text}</b><br>length:%{z} <br></b>Arguments:%{customdata} ',
+            text=data[data[group_label] == cls].id,
+            mode='markers',
+            name= str(cls),
+            marker=dict(
+                size=3,
+                #color=cls,  # set color to an array/list of desired values
+                colorscale='Viridis',  # choose a colorscale
+                opacity=0.8
+            )
+        ) for cls in group_set ],
+        layout=go.Layout( 
+            title=dict(
+                text='Semantics Distribution',
+                xref="paper",
+                yref="paper",
+                #x=0.5,
+                font=dict(
+                    size=20,
+                )
+            ),
+            autosize=False,
+            width=650,#700,
+            height=700,
+            showlegend=True,
+        )
+    )
+    return fig, fig2
 
 @app.callback(
     [Output("bar_chart", "figure"),Output("my-range-slider","figure")],
-    [Input("data_present_selector", "value"),Input("my-range-slider", "value"),Input("sort_selector", "value")],
-    )
+    [Input("data_present_selector", "value"),Input("my-range-slider", "value"),Input("sort_selector", "value")])
 @cache.memoize(TIMEOUT)
 def make_bar_figure(present_data, valuelist,sort_state):
 
@@ -1363,7 +1136,6 @@ def make_bar_figure(present_data, valuelist,sort_state):
        else:
            figure = set_bar_figure(dataset, [min,max])
     return figure,slider
-
 
 def set_bar_figure(argument_data, valuelist):
 
@@ -1395,10 +1167,10 @@ def set_bar_figure(argument_data, valuelist):
     figure = dict(data=data, layout=layout_count)
     return figure
 
-@app.callback([Output("stop_confirm", "displayed"),Output("progress-extension", "animated"),Output("progress-process", "animated")] ,  #should be style
-       [Input('submit-button-state', 'n_clicks'), ], #Input("signal","children"),
-        [State('signal', 'children')]
-              )
+@app.callback(
+    [Output("stop_confirm", "displayed"),Output("progress-extension", "animated"),Output("progress-process", "animated")] ,  #should be style
+    [Input('submit-button-state', 'n_clicks'), ], #Input("signal","children"),
+    [State('signal', 'children')])
 def show_confirm(n_clicks,value):
 
     if n_clicks>0:
@@ -1412,8 +1184,7 @@ def show_confirm(n_clicks,value):
     else:
         return False, False, False
 
-@app.callback(Output("confirm", "displayed"),
-       [Input("hidden-div","figure")])
+@app.callback(Output("confirm", "displayed"),[Input("hidden-div","figure")])
 def show_confirm(value):
     if value :
         #print(n_click)
@@ -1422,11 +1193,9 @@ def show_confirm(value):
             return True
     return False
 
-
 @app.callback(
     [Output("eps", "disabled"),Output("minpts", "disabled"),Output('cluster_num', "disabled")],
-    [Input("default_params", "value")],
-    )
+    [Input("default_params", "value")],)
 @cache.memoize(TIMEOUT)
 def make_bar_figure(defaut_params):
     print("default param",defaut_params)
@@ -1434,7 +1203,6 @@ def make_bar_figure(defaut_params):
         return False,False,False #for now
     else:
         return True,True,True
-
 
 @app.callback(Output('hidden-div', 'figure'),
               [Input('view-processed-button', 'contents'),Input("view_button","n_clicks")],
@@ -1461,23 +1229,16 @@ def update_output(contents, n_click, name):
         return None
 
 @app.callback([Output('processed-list', 'children'),Output("extension-list",'children'),],
-              [ Input('signal', 'children'),Input('hidden-div', 'figure'), Input('confirm', 'submit_n_clicks')])#
-
+              [ Input('signal', 'children'),Input('hidden-div', 'figure'), Input('confirm', 'submit_n_clicks')])
 def update_output(children1, children2, n_click):
     if  children2:
         return [html.Li(file_download_link(filename)) for filename in children2],get_file_name(EXTENSION_DIR)
 
     return  get_file_name(ZIP_DIRECTORY),get_file_name(EXTENSION_DIR)
 
-
-
 @app.callback(
-    [Output("selected_cluster","children"),
-        Output('info-container', 'children')
-        ,Output("pie_graph", "figure")],
-    [Input('bar_chart', 'clickData') ,Input("clustering-method","value")]) #Input("check_semantics","value")
-
-
+    [Output("selected_cluster","children"), Output('info-container', 'children'), Output("pie_graph", "figure")],
+    [Input('bar_chart', 'clickData'), Input("clustering-method","value")])
 def update_cluster_rate(clickData, cluster_method):
     process_data, _ = get_data(check_combined = False)
 
@@ -1602,11 +1363,9 @@ def update_cluster_rate(clickData, cluster_method):
 
     return result0, mini_block, pie_figure
 
-
 @app.callback(
     Output('basic-interactions', 'figure'),
     [Input('bar_chart', 'clickData'), Input("argument-dimensional-reduction","value"), Input("clustering-method","value")])
-
 def update_graph(clickData, dimensional_reduction, cluster_method):
 
     process_data, _ = get_data(check_combined = False)
@@ -1663,228 +1422,25 @@ def update_graph(clickData, dimensional_reduction, cluster_method):
         'layout': layout_scatter
     }
 
-# @app.callback([Output('3d_scatter_cluster', 'figure'),Output('3d_scatter_group', 'figure'),Output('3d_scatter_cluster', 'style'),Output('3d_scatter_group', 'style')],
-#             [ Input('dropdown-3d', 'n_clicks'),Input('dropdown-2d', 'n_clicks'), Input("dimensional-reduction1","value"), Input("clustering-method","value"),]
-#               )
-def display3d( reduction_method, semantics,cluster_method):
-    #print("3d click:", selected_3d)
-    data, group_label = get_data()
-
-    if reduction_method=="svd":
-        x_axe="svd_position_x"
-        y_axe="svd_position_y"
-    elif reduction_method=="tsne":
-        x_axe = "tsne_position_x"
-        y_axe = "tsne_position_y"
-    else:
-        x_axe = "auto_position_x"
-        y_axe = "auto_position_y"
-    cluster_label = cluster_method + "_cluster_label"
-    cluster_set = data[cluster_label].unique()
-    print('cluster selected:', cluster_label)
-    print('cluster label:', cluster_set)
-    # fig = go.Figure(go.Scatter3d(
-    #     x=data[x_axe],
-    #     y=data[y_axe],
-    #     z=[len(set(s)) for s in data["arg"]],
-    #     text=["clusters: {}".format(x) for x in data[cluster_label]],
-    #     name=data[cluster_label].tolist(),
-    #     mode='markers',
-    #     marker=dict(
-    #         size=12,
-    #         color=data[cluster_label],  # set color to an array/list of desired values
-    #         colorscale='Viridis',  # choose a colorscale
-    #         opacity=0.8
-    #     )
-    # ),
-    #
-    #
-    # )
-    #processed_data[processed_data[cluster_label] == cls][x_axe]
-    text_list=[]
-    inputdata=data.copy()
-    for index, row in inputdata.iterrows():
-        arg_list=list(row.arg)
-        inserted_arg=[x for y in (arg_list[i:i + 6] + ["<br>"] * (i < len(arg_list) - 5) for
-                     i in range(0, len(arg_list), 6)) for x in y]
-        one_arg = str(inserted_arg).strip('[]')
-        #input_arg=f_comma(one_arg, group=20, char='<br>')
-        input_arg=one_arg.strip('"') #remove ' from string
-        text_list.append(input_arg)
-
-    inputdata["arguments"]=text_list
-    symbols=['circle', 'square', 'cross', 'square-open', 'x','diamond', 'diamond-open', 'circle-open']
-    if len(cluster_set)<=len(symbols):
-        cluster_symbol=symbols
-    else:
-        cluster_symbol=[None]*len(cluster_set)
-    print('cluster_symbol:', cluster_symbol)
-    fig = go.Figure(data=[go.Scatter3d(
-            x=data[data[cluster_label]==cls][x_axe],
-            y=data[data[cluster_label]==cls][y_axe],
-            z=[len(set(s)) for s in data[data[cluster_label]==cls]["arg"]],
-            #customdata=data[data[cluster_label]==cls]['id'],
-            customdata=['<br>'+s for s in inputdata[inputdata[cluster_label]==cls]["arguments"]],
-            hovertemplate='Id:%{text}</b><br>length:%{z} <br></b>Arguments:%{customdata} ',
-            text=data[data[cluster_label]==cls].id,
-            #text=["cluster: {}".format(x) for x in data[data[cluster_label]==cls][cluster_label]],
-            mode='markers',
-            name="cluster"+str(cls+1),
-            marker=dict(
-                size=3,
-                color=cls,  # set color to an array/list of desired values
-                colorscale='Viridis',  # choose a colorscale
-                opacity=0.8,
-                symbol=cluster_symbol[cls-1]
-            ),
-
-        ) for cls in cluster_set
-        ],
-        layout=go.Layout(title=dict(
-            text='Clusters Distribution',
-            xref="paper",
-            yref="paper",
-            #x=0.5,
-            font=dict(
-                size=20,
-            )
-        ),
-
-            autosize=False,
-            width=650,
-            height=700,
-            showlegend=True,
-        )
-    )
-
-    group_set = data[group_label].unique()
-    fig2 = go.Figure(data=[go.Scatter3d(
-        x=data[data[group_label] == cls][x_axe],
-        y=data[data[group_label] == cls][y_axe],
-        z=[len(set(s)) for s in data[data[group_label] == cls]["arg"]],
-        # text=["groups: {}".format(x) for x in data[data[group_label] == cls][group_label]],
-
-        customdata=['<br>' + s for s in inputdata[inputdata[group_label] == cls]["arguments"]],
-        hovertemplate='Id:%{text}</b><br>length:%{z} <br></b>Arguments:%{customdata} ',
-        text=data[data[group_label] == cls].id,
-        mode='markers',
-        name= str(cls),
-        marker=dict(
-            size=3,
-            #color=cls,  # set color to an array/list of desired values
-            colorscale='Viridis',  # choose a colorscale
-            opacity=0.8
-        )
-    ) for cls in group_set
-    ],
-    layout=go.Layout( title=dict(
-                                text='Semantics Distribution',
-                                xref="paper",
-                                yref="paper",
-                                #x=0.5,
-                                font=dict(
-                                    size=20,
-                                )
-                        ),
-                        autosize=False,
-                        width=650,#700,
-                        height=700,
-                        showlegend=True,
-    ))
-    # fig2.update_layout(
-    #
-    #     autosize=False,
-    #     width=850,
-    #     height=850,
-    # )
-    return fig,fig2#,{'display':'block'},{'display':'block'}
-
-
-@app.callback(Output('correlation_hm', 'figure'),
-              [Input('btn-nclicks-1', 'n_clicks'),Input('btn-nclicks-2', 'n_clicks'),Input('btn-nclicks-3', 'n_clicks'),Input('btn-nclicks-4', 'n_clicks')])
-def displayClick(btn1, btn2 , btn3, btn4):
-
-    data_correlation, _ = get_data(btn1, "correlation_matrix", False)
-    processed_data, _ = get_data(btn1, "processed_data", False)
-
-    changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
-
-
-    round_correlation = data_correlation.copy()
-    threshold=1/(2*len(processed_data))
-    for idx, raw in round_correlation.iterrows():
-        for x in raw.index:
-            to_round_value=raw[x]
-            if -threshold<=to_round_value<=threshold:
-                round_correlation.loc[idx, x]=0
-            else:
-                round_correlation.loc[idx, x] = round(to_round_value, 10)
-
-    abs_correlation = round_correlation.copy() #data_correlation
-    for idx, raw in abs_correlation.iterrows():
-        for x in raw.index:
-            abs_correlation.loc[idx, x] = abs(raw[x])
-
-    if btn1%2:
-        temp_round_correlation=round_correlation.copy()
-        distances = np.sqrt((1 - abs_correlation) / 2)
-        res_order = compute_serial_matrix(distances.values, method='single')
-        new_order = [abs_correlation.index[i] for i in res_order]
-
-        ordered_correlation_matrix = round_correlation.reindex(index=new_order, columns=new_order) #data_correlation.reindex
-        z_value=ordered_correlation_matrix.to_numpy()
-        # original_z = z_value.copy()
-        # a = pd.DataFrame(data=original_z, index=new_order, columns=new_order)
-        # a.to_pickle("method1.pkl")
-        #z_value[z_value==0]=np.nan
-        x_value=[str(x)+"arg" for x in new_order]
-        y_value=[str(x)+"arg" for x in new_order]
-
-    elif btn2%2:
-        all_new_order=innovative_correlation_clustering(round_correlation)
-        new_test = round_correlation.reindex(index=all_new_order, columns=all_new_order)#data_correlation.reindex
-        z_value=new_test.to_numpy()
-        # original_z = z_value.copy()
-        # a = pd.DataFrame(data=original_z, index=all_new_order, columns=all_new_order)
-        # a.to_pickle("method2.pkl")
-        #z_value[z_value == 0] = np.nan
-        x_value=[str(x) + "arg" for x in new_test.columns]
-        y_value=[str(x) + "arg" for x in new_test.index]
-
+@app.callback(
+    Output('correlation_hm', 'figure'),
+    [Input('btn-nclicks-1', 'n_clicks'),Input('btn-nclicks-2', 'n_clicks'),Input('btn-nclicks-3', 'n_clicks'),Input('btn-nclicks-4', 'n_clicks')])
+def display_correlation_matrix(btn1, btn2 , btn3, btn4):
+    matrix_type = "" #these works as a toggle, not button. Bugged if clicked alternating the modes
+    if btn1 % 2:
+        matrix_type = 'hrp'
+    elif btn2 % 2:
+        matrix_type = 'r-hrp'
     elif btn3 % 2:
-        new_order=abs_optimal_leaf_ordering(data_correlation)
-        ordered_correlation_matrix = round_correlation.reindex(index=new_order, columns=new_order)#data_correlation.reindex
-        z_value = ordered_correlation_matrix.to_numpy()
-        # original_z = z_value.copy()
-        # a = pd.DataFrame(data=original_z, index=new_order, columns=new_order)
-        # a.to_pickle("method3.pkl")
-        #z_value[z_value == 0] = np.nan
-        x_value = [str(x) + "arg" for x in new_order]
-        y_value = [str(x) + "arg" for x in new_order]
+        matrix_type = 'olo'
     elif btn4 % 2:
-        all_new_order=my_optimal_leaf_ordering(round_correlation)
-        new_test = round_correlation.reindex(index=all_new_order, columns=all_new_order)#data_correlation.reindex
-        z_value = new_test.to_numpy()
-        # original_z = z_value.copy()
-        # a=pd.DataFrame(data=original_z, index=all_new_order, columns=all_new_order)
-        # a.to_pickle("method4.pkl")
-        #z_value[z_value == 0] = np.nan
-        x_value = [str(x) + "arg" for x in new_test.columns]
-        y_value = [str(x) + "arg" for x in new_test.index]
-    else:
-        z_value=round_correlation.to_numpy()#data_correlation.reindex
-        #original_z=z_value.copy()
-        #z_value[z_value == 0] = np.nan
-        x_value=[str(x)+"arg" for x in round_correlation.columns]
-        y_value=[str(x)+"arg" for x in round_correlation.index]
-
-
-
+        matrix_type = 'r-olo'
+    
+    x, y, z = get_correlation(matrix_type)
     fig = go.Figure(go.Heatmap(
-        z=z_value,
-        x=x_value,
-        y=y_value,
-        #customdata =original_z,
+        z=z,
+        x=x,
+        y=y,
         hovertemplate='value:%{z} <br><b>x:%{x}</b><br>y: %{y} ',
         name='',
         colorscale='RdBu',
@@ -1899,12 +1455,64 @@ def displayClick(btn1, btn2 , btn3, btn4):
     fig.update_xaxes(side="top")
     return fig
 
-@app.callback([Output('feature_semantic_table', 'children'),
-               Output('feature_cluster_table', 'children')],
-              [Input('signal', 'children'),
-               Input("clustering-method", "value"),
-               Input('confirm', 'submit_n_clicks'),Input("semantic-method-1", "value"),])
-def get_feature_table(content, cluster_method, n_click, table_method):
+def get_correlation(matrix_type):
+    data_correlation, _ = get_data(name="correlation_matrix")
+    processed_data, _ = get_data(name="processed_data")
+
+    round_correlation = data_correlation.copy()
+    threshold=1/(2*len(processed_data))
+    for idx, raw in round_correlation.iterrows():
+        for x in raw.index:
+            to_round_value=raw[x]
+            if -threshold<=to_round_value<=threshold:
+                round_correlation.loc[idx, x]=0
+            else:
+                round_correlation.loc[idx, x] = round(to_round_value, 10)
+
+    abs_correlation = round_correlation.copy() 
+    for idx, raw in abs_correlation.iterrows():
+        for x in raw.index:
+            abs_correlation.loc[idx, x] = abs(raw[x])
+
+    if matrix_type == 'hrp':
+        distances = np.sqrt((1 - abs_correlation) / 2)
+        res_order = compute_serial_matrix(distances.values, method='single')
+        new_order = [abs_correlation.index[i] for i in res_order]
+
+        ordered_correlation_matrix = round_correlation.reindex(index=new_order, columns=new_order) 
+        z_value=ordered_correlation_matrix.to_numpy()
+        x_value=[str(x)+"arg" for x in new_order]
+        y_value=[str(x)+"arg" for x in new_order]
+    elif matrix_type == 'r-hrp':
+        all_new_order=innovative_correlation_clustering(round_correlation)
+        new_test = round_correlation.reindex(index=all_new_order, columns=all_new_order)
+        z_value=new_test.to_numpy()
+        x_value=[str(x) + "arg" for x in new_test.columns]
+        y_value=[str(x) + "arg" for x in new_test.index]
+
+    elif matrix_type == 'olo':
+        new_order=abs_optimal_leaf_ordering(data_correlation)
+        ordered_correlation_matrix = round_correlation.reindex(index=new_order, columns=new_order)
+        z_value = ordered_correlation_matrix.to_numpy()
+        x_value = [str(x) + "arg" for x in new_order]
+        y_value = [str(x) + "arg" for x in new_order]
+    elif matrix_type == 'r-olo':
+        all_new_order=my_optimal_leaf_ordering(round_correlation)
+        new_test = round_correlation.reindex(index=all_new_order, columns=all_new_order)
+        z_value = new_test.to_numpy()
+        x_value = [str(x) + "arg" for x in new_test.columns]
+        y_value = [str(x) + "arg" for x in new_test.index]
+    else:
+        z_value=round_correlation.to_numpy()
+        x_value=[str(x)+"arg" for x in round_correlation.columns]
+        y_value=[str(x)+"arg" for x in round_correlation.index]
+
+    return x_value, y_value, z_value
+
+@app.callback(
+    [Output('feature_semantic_table', 'children'), Output('feature_cluster_table', 'children')],
+    [Input("clustering-method", "value"),Input('confirm', 'submit_n_clicks'),Input("semantic-method-1", "value"),])
+def get_feature_table(cluster_method, n_click, table_method):
     if len(os.listdir(PROCESSED_DIRECTORY)) == 12:
         group_table = pd.read_pickle(PROCESSED_DIRECTORY + "group_feature.pkl")
         cluster_table = pd.read_pickle(PROCESSED_DIRECTORY + table_method + "_" + cluster_method + "_cluster_feature.pkl")
@@ -1925,7 +1533,6 @@ def get_feature_table(content, cluster_method, n_click, table_method):
         table2=dbc.Table.from_dataframe(cluster_table, striped=True, bordered=True, hover=True)
 
     return [table1, table2]
-
 
 if __name__ == '__main__':
     app.run_server(debug=True)
