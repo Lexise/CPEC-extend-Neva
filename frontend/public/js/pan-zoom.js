@@ -42,12 +42,12 @@ const thumbnailViewer = function (options) {
 
     const initMain = function () {
         const mainViewSVGDoc = getSVGDocument(document.getElementById(options.mainViewId));
-    
+
         if (_main) {
             _main.destroy();
             _main = null;
         }
-        
+
         const main = svgPanZoom("#" + options.mainViewId, {
             zoomEnabled: true,
             controlIconsEnabled: true,
@@ -189,7 +189,7 @@ const thumbnailViewer = function (options) {
         c.addEventListener("click", initThumb);
     }
 
-    document.addEventListener('reinit-minimap',  () => {
+    document.addEventListener('reinit-minimap', () => {
         _main.resize();
         _thumb.resize();
         _thumb.updateThumbScope();
@@ -205,8 +205,8 @@ const thumbnailViewer = function (options) {
                     initMain();
                 }, 50);
                 once = false;
-            }   
-        }   
+            }
+        }
     });
 
     document.addEventListener("drawend", (e) => {

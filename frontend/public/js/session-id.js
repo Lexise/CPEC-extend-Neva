@@ -1,3 +1,3 @@
 function getSessionId() {
-  return document.getElementById('uuid').value;
+    return document.getElementById('uuid').value;
 }

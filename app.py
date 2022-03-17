@@ -64,6 +64,8 @@ def download(path):
         return send_from_directory(UPLOAD_DIRECTORY, path, as_attachment=True)
     elif os.path.exists(PROCESSED_DIRECTORY+path):
         return send_from_directory(PROCESSED_DIRECTORY, path, as_attachment=True)
+    elif os.path.exists(EXTENSION_DIR+path):
+        return send_from_directory(EXTENSION_DIR, path, as_attachment=True)
     elif os.path.exists(ZIP_DIRECTORY + path):
         return send_from_directory(ZIP_DIRECTORY, path, as_attachment=True)
     else:
@@ -79,13 +81,23 @@ def data():
     y_axe = reduction + "_position_y"
     method = cluster_method + '_cluster_label'
     data['z'] = [len(set(s)) for s in data["arg"]]
-    return data[[x_axe, y_axe, 'z', method, color_label]].rename(
+    
+    return data[['id', x_axe, y_axe, 'z', method, color_label]].rename(
         columns = {
             x_axe :'x',
             y_axe :'y',
             method : 'c',
             color_label: 'gc'
         }).T.to_json()
+
+@server.route("/data_args")
+def data_args():
+    id = request.args['id'] # required
+    data, _ = get_data()
+
+    data = data[ [str(x) == str(id) for x in data['id']] ]
+    return data[['id', 'arg']].T.to_json()
+
 
 def get_data(n_click = None, name = "processed_data", check_combined = True):
     if check_combined and len(os.listdir(PROCESSED_DIRECTORY)) == 12 and os.path.isfile(PROCESSED_DIRECTORY + "CombinedProcessed_data.pkl"): #or semantic =="cf2_stage2":
@@ -673,6 +685,7 @@ def global_store(eps, minpts, n_cluster, use_optim,semantics):
         ])
         #zipname=files[0].strip("apx")+"zip"
     try:
+        
         if len(extensions) == 0:
             extension_dir=EXTENSION_DIR
             end=""
@@ -701,9 +714,12 @@ def global_store(eps, minpts, n_cluster, use_optim,semantics):
             # P = Process(target=compute_extensions, args=(UPLOAD_DIRECTORY +question,asp_encoding,EXTENSION_DIR+extension_file,string))
             #
             # P.start()
+            print('computing extensions....')
             compute_extension_result=compute_extensions(UPLOAD_DIRECTORY +question,ASP_DIR+asp_encoding,EXTENSION_DIR+extension_file)
+            print('extensions computed!')
             #print("done\n : string is ",string)
             if compute_extension_result=='oversize': #len(string) >0 and string[0]=='oversize':
+                print('oversize')
                 return 'oversize'
         else:
             extension_dir=UPLOAD_DIRECTORY
@@ -712,9 +728,7 @@ def global_store(eps, minpts, n_cluster, use_optim,semantics):
 
     except Exception as e:
         print('error:',e)
-        return html.Div([
-            'input data is not proper.'
-        ])
+        return html.Div([ 'input data is not proper.' ])
     if question!="" :
         print("finish extensions computing:", time.process_time() - start_time0)
         start_time = time.process_time()#time.time()
@@ -722,13 +736,9 @@ def global_store(eps, minpts, n_cluster, use_optim,semantics):
         process_pair_semantics=Process_data('start')
         result=process_pair_semantics.process_data(PROCESSED_DIRECTORY,UPLOAD_DIRECTORY+question, extension_dir+extension_file,eps, minpts, n_cluster,use_optim,semantics)
         if not result:
-            return html.Div([
-                'no extensions exist for the selected semantics'
-            ])
+            return html.Div([ 'no extensions exist for the selected semantics' ])
         elif result=='parameter_mistakes':
-            return html.Div([
-                'parameter mistakes'
-            ])
+            return html.Div([ 'parameter mistakes' ])
         #process_data(PROCESSED_DIRECTORY, UPLOAD_DIRECTORY + question, UPLOAD_DIRECTORY + stg_answer, eps, minpts, n_cluster)
 
         print("(whole)get processed data", time.process_time() - start_time) #time.time() - start_time)
@@ -750,7 +760,16 @@ def show_other_option(semantics):
     [Input('submit-button-state', 'n_clicks'),Input("check_semantics", "value")],
     [State("default_params", "value"),State('eps', 'value'), State('minpts', 'value'), State('cluster_num', 'value'),State('store-prev-comparisons', 'data')])
 def compute_value( n_clicks, semantics, use_optim, eps, minpts, n_cluster,semantics2):
-    # compute value and send a signal when done
+    
+    print("compute value\n" + 
+        "n_clicks " + str(n_clicks) + "\n " + 
+        "semantics " + str(semantics) + "\n " + 
+        "use_optim " + str(use_optim) + "\n " + 
+        "eps " + str(eps) + "\n " + 
+        "minpts " + str(minpts) + "\n " + 
+        "n_cluster " + str(n_cluster) + "\n " + 
+        "semantics2 " + str(semantics2)
+    )
 
     if len(os.listdir(UPLOAD_DIRECTORY)) == 0:
         print("return no content")
@@ -761,7 +780,7 @@ def compute_value( n_clicks, semantics, use_optim, eps, minpts, n_cluster,semant
                 raise dash.exceptions.PreventUpdate
             return global_individual(eps, minpts, n_cluster,use_optim, semantics2), semantics2
         if int(n_clicks)>0:
-            return [global_store(eps, minpts, n_cluster,use_optim, semantics),semantics]
+            return global_store(eps, minpts, n_cluster,use_optim, semantics), semantics
         return "", semantics #already  process, no need to pass data again
 
 @app.callback(
@@ -1172,7 +1191,7 @@ def set_bar_figure(argument_data, valuelist):
     [Input('submit-button-state', 'n_clicks'), ], #Input("signal","children"),
     [State('signal', 'children')])
 def show_confirm(n_clicks,value):
-
+    print('show confirm: ' + str(n_clicks) + " " + str(value))
     if n_clicks>0:
         if value=='oversize':
             return True, False, False
@@ -1273,35 +1292,6 @@ def update_cluster_rate(clickData, cluster_method):
             className="mini_container",
             )
         mini_block.append(current)
-                        # semantic_first=semantics[0]
-                        # semantic_second=semantics[1]
-                        # stable_value=len(data[data.groups == semantic_first])/ len(data) * 100
-                        # stable = "{:.2f}".format(stable_value) + "%"
-                        # prefer_value = len(data[data.groups == semantic_second]) / len(data) * 100
-                        # other = "{:.2f}".format(prefer_value) + "%"
-    # if "preferred" in semantics:
-    #     prefer_value=len(data[data.groups == "preferred-"])/ len(data) * 100
-    #     other="{:.2f}".format(prefer_value)+"%"
-    #     pr_display={'display':'block'}
-    #     stg_display={'display':'none'}
-    # else:
-    #     stage_value = len(data[data.groups == "stage"]) / len(data) * 100
-    #     other = "{:.2f}".format(stage_value) + "%"
-    #     pr_display = {'display': 'none'}
-    #     stg_display = {'display': 'block'}
-
-    # x = [html.Div(
-    #     [html.H6(stable), html.P(semantic_first)],
-    #     id="stable_block",
-    #     className="mini_container",
-    # ),
-    #     html.Div(
-    #         [html.H6(other), html.P(semantic_second)],
-    #         id="prefer_block",
-    #         className="mini_container",
-    #
-    #     )]
-
 
     result = dict({
         "cluster": [],

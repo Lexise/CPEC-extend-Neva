@@ -2,6 +2,7 @@ from numpy import mean
 import pandas as pd
 from sklearn.model_selection import cross_val_score
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.datasets import make_blobs
 import pathlib
 from skopt.space import Integer,Real
 from skopt.utils import use_named_args
@@ -12,14 +13,14 @@ from warnings import simplefilter
 
 def bayesian_optimization(data,cluster_method):
     X = data['in']
-
+    
     if 'groups' in data.columns:
         y = data['groups']  #catagory
         semantic_label='groups'
     else:
         y = data['category']
         semantic_label='category'
-
+    
     if cluster_method=='dbscan':
         model=DBSCAN
         search_space = [Real(1.2, 2.5, name='eps'), Integer(5, 12, name='min_samples')]

@@ -4,12 +4,12 @@
 @import "pan-zoom.css";
 
 :root {
-	--color-primary: #799c78 !important;
-	--color-primary-light: #a6c0a5 !important;
-	--color-primary-transparent-70: hsla(118, 26%, 74%, 0.7) !important;
+	--color-primary: #72a9be !important;
+	--color-primary-light: #a2c6d4 !important;
+	--color-primary-transparent-70: hsla(197, 37%, 73%, 0.7) !important;
 	--color-primary-transparent-20: hsla(118, 26%, 74%, 0.2) !important;
-	--color-secondary: #93ad93 !important;
-	--color-secondary-light: #b1beb1 !important;
+	--color-secondary: #93a8ad !important;
+	--color-secondary-light: #b1babe !important;
 
 	--color-red-light: #ffebee;
 	--color-red: #ef9a9a;
@@ -25,7 +25,7 @@
 	--color-yellow-dark: #b89c00;
 	--color-orange-light: #fdefe3;
 	--color-orange: #f6ab64;
-  --color-orange-dark: #bb6b20;
+  	--color-orange-dark: #bb6b20;
 	--color-teal-light: #e0f2f1;
 	--color-teal: #80cbc4;
 	--color-teal-dark: #36afa3;

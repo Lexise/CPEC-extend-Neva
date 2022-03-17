@@ -58,51 +58,41 @@ def get_color_label(processed_data, color_label, groups_set):
             else:
                 processed_data["color"].replace({x: colors[0]}, inplace=True)
                 del colors[0]
+
 class Process_data:
     def __init__(self, stage):
         self.stage = stage
         #self.processed_data = pd.DataFrame()
 
-
-
-
     def process_extension_individual(self,question, item, processed_dir, upload_dir, extenion_dir,aps_dir): # for "other" situation, when user want to select their own semantics or semantic pairs
 
-            if item == 'stable':
-                asp_encoding = "stable_web.dl"
-                end = "STB"
-            elif item == 'preferred':
-                asp_encoding = "preferred-cond-disj.dl"
-                end = "PR"
-            elif item == 'stage':
-                asp_encoding = "stage-cond-disj.dl"
-                end = "STG"
-            elif item == 'semi-stable':
-                asp_encoding = "semi-cond-disj.dl"
+        if item == 'stable':
+            asp_encoding = "stable_web.dl"
+            end = "STB"
+        elif item == 'preferred':
+            asp_encoding = "preferred-cond-disj.dl"
+            end = "PR"
+        elif item == 'stage':
+            asp_encoding = "stage-cond-disj.dl"
+            end = "STG"
+        elif item == 'semi-stable':
+            asp_encoding = "semi-cond-disj.dl"
 
-                end = "SEMI-STB"
-            elif item == 'cf2':
-                asp_encoding = "cf2_web.dl"
-                end = "CF2"
-            # elif item == 'stage2':
-            #     asp_encoding = "stage2_web.txt"
-            #     end = "STG2"
-            else:
-                return False
-            extension_file = "{}.EE_{}".format(question, end)
-            self.stage='extension computing of a single semantics'
-            compute_extensions(upload_dir +question,aps_dir+asp_encoding,extenion_dir+extension_file)
+            end = "SEMI-STB"
+        elif item == 'cf2':
+            asp_encoding = "cf2_web.dl"
+            end = "CF2"
+        # elif item == 'stage2':
+        #     asp_encoding = "stage2_web.txt"
+        #     end = "STG2"
+        else:
+            return False
+        extension_file = "{}.EE_{}".format(question, end)
+        self.stage='extension computing of a single semantics'
+        print(self.stage + "....")
+        compute_extensions(upload_dir +question,aps_dir+asp_encoding,extenion_dir+extension_file)
 
-            return extension_file
-            # os.system(
-            #     "D:/test2/clingo-4.5.4-win64/clingo.exe {} data/app_uploaded_files/{} 0 > data/extension_sets/{}".format(
-            #         asp_encoding, question, extension_file))
-            # process_data_two_sets(processed_dir, upload_dir + question, extenion_dir + extension_file, eps, minpts,
-            #              n_cluster, item)
-
-
-
-
+        return extension_file
 
     def find_semantic_files(files,item):#find corresponding extension file
         if item == 'stable':
@@ -131,6 +121,7 @@ class Process_data:
 
     def addional_process_individual(self,processed_dir, semantics):
         self.stage='combine extensions of two semantics'
+        print(self.stage + "....")
         if len(semantics)==1:
             return False
         semantic1=semantics[0]
@@ -160,10 +151,9 @@ class Process_data:
         processed_data = pd.concat([present_data1, present_data2, present_common])
         processed_data.to_pickle(processed_dir + "CombinedProcessed_data.pkl")
 
-
-
     def get_catogery(self,processed_dir, semantics):
         self.stage='get semantics label'
+        print(self.stage + "....")
         if len(semantics)==1:
             return False
         semantic1=semantics[0]
@@ -180,43 +170,20 @@ class Process_data:
         processed_data_stage2.to_pickle(processed_dir + semantic1 + "_processed_data.pkl")
         processed_data_cf2.to_pickle(processed_dir + semantic2 + "_processed_data.pkl")
 
-
-
-
-
-
-
-
-
-        # else:
-        #     # ef8a62
-        #     # ffffff
-        #     # 999999
-        #     colors=['#f6e8c3','#f5f5f5','#c7eae5'] #['#e41a1c','#377eb8','#4daf4a']
-        #     for x in range(0,len(groups_set)):
-        #         processed_data["color"].replace({groups_set[x]: colors[x]}, inplace=True)
-
-    # def change_to_hotpot(answer, item):
-    #
-    #       returnlist = [0]*len(item)
-    #       for ele in answer:
-    #         if ele in item:
-    #           returnlist[item.index(ele)]=1
-    #       return returnlist
-
-
     def f_comma(my_str, group, char=','):
-            my_str = str(my_str)
-            return char.join(my_str[i:i+group] for i in range(0, len(my_str), group))
+        my_str = str(my_str)
+        return char.join(my_str[i:i+group] for i in range(0, len(my_str), group))
 
     def clustering_km(self, data, cluster_num=2):
         self.stage = 'Kmeans clustering'
+        print(self.stage + "....")
         km = KMeans(n_clusters=cluster_num, precompute_distances='auto').fit_predict(list(data['in']))
         data['km_cluster_label'] = [i + 1 for i in km]
         return data
 
     def clustering_dbscan(self, data, eps=1.7, minpoint=7):
         self.stage = 'DBscan clustering'
+        print(self.stage + "....")
         c = DBSCAN(eps=eps, min_samples=minpoint).fit_predict(list(data['in']))
         data['db_cluster_label'] = [i + 1 for i in c]
         return data
@@ -224,6 +191,7 @@ class Process_data:
     def dimensional_reduction_autoencoding(self, data, processed_data) -> pd.DataFrame:
         start = time.process_time()
         self.stage = 'dimentional reduction autoencoder'
+        print(self.stage + "....")
         encoding_dim = 2
         original_shape = data.shape[1]
         input_df = Input(shape=(original_shape,))
@@ -254,21 +222,23 @@ class Process_data:
         encoded_X_train = encoder.predict(data).T
         processed_data['auto_position_x'] = encoded_X_train[0]
         processed_data['auto_position_y'] = encoded_X_train[1]
-        print("Autoencoding dimensional reduciton: ", time.process_time() - start)
+        print("Autoencoding dimensional reduction: ", time.process_time() - start)
         return processed_data
 
     def dimensional_reduction(self, data):
         start1 = time.process_time()
         self.stage = 'dimentional reduction Tsne'
+        print(self.stage + "....")
         result2 = TSNE(n_components=2).fit_transform(list(data['in'])).T
         data['tsne_position_x'] = result2[0]
         data['tsne_position_y'] = result2[1]
-        print("Tsne dimensional reduciton: ", time.process_time() - start1)
+        print("Tsne dimensional reduction: ", time.process_time() - start1)
         svd = TruncatedSVD(n_components=2, n_iter=7)
         start2 = time.process_time()
         self.stage = 'dimentional reduction svd'
+        print(self.stage + "....")
         result = svd.fit_transform(list(data['in'])).T
-        print("SVD dimensional reduciton: ", time.process_time() - start2)
+        print("SVD dimensional reduction: ", time.process_time() - start2)
         data['svd_position_x'] = result[0]
         data['svd_position_y'] = result[1]
         return data
@@ -327,7 +297,7 @@ class Process_data:
                     for x in range(len(common_links), 1, -1):
                         temp = False
                         combinitions = list(
-                            itertools.combinations(common_links, x - 1))  # 对于15长度的common_links, 3003 for x =11  太多了
+                            itertools.combinations(common_links, x - 1))  
                         for combine in combinitions:
                             combine = set(combine)
                             if not any(combine.issubset(x) for x in other_cluster_arg):
@@ -401,6 +371,7 @@ class Process_data:
         #    "D:/test2/clingo-4.5.4-win64/clingo.exe prefex.dl apx_files/AachenerVerkehrsverbund_26October2020.zip_train+metro+tram+bus.lp.apx 0 > extension_sets/test.EE_PR")
         start = time.process_time()
         self.stage='data preprocess: extraction and transformation'
+        print(self.stage + "....")
         with open(arguments_file, 'r') as file:
             question = file.read()
         itemlist = [s for s in re.findall(r"arg[(]a(.*?)[)].", question)]
@@ -479,6 +450,7 @@ class Process_data:
         print("generally process answer sets( read data, one hot, group label, ): ", time.process_time() - start)
         start2 = time.process_time()
         self.stage='bayesian optimization on DBscan '
+        print(self.stage + "....")
         if use_optim:
             eps, minpts = bayesian_optimization(processed_data, 'dbscan')
 
@@ -499,14 +471,24 @@ class Process_data:
         #     else:
         #         processed_data = clustering_dbscan(processed_data)
         print("dbscan clustering: ", time.process_time() - start2)
-
-        processed_data = self.dimensional_reduction(processed_data)
-        y = np.array([np.array(xi) for xi in transfered])    #to change and test###############减少需要内存大小
-        processed_data =self.dimensional_reduction_autoencoding(y, processed_data)
-        #processed_data =dimensional_reduction_autoencoding(for_auto_reduction, processed_data)
+        reducible = True
+        for i in range(0, len(list(processed_data['in']))): 
+            print(list(processed_data['in'])[i].shape) 
+            if (list(processed_data['in'])[i].shape[0] < 2): 
+                reducible = False
+        
+        if reducible:
+            processed_data = self.dimensional_reduction(processed_data)
+            y = np.array([np.array(xi) for xi in transfered])    #to change and test###############减少需要内存大小
+            processed_data =self.dimensional_reduction_autoencoding(y, processed_data)
+            #processed_data =dimensional_reduction_autoencoding(for_auto_reduction, processed_data)
+        else: 
+            print('cannot reduce data')
+        
         start3 = time.process_time()
         if use_optim:
             self.stage = 'bayesian optimization on DBscan '
+            print(self.stage + "....")
             n_cluster = bayesian_optimization(processed_data, 'kmeans')
             processed_data = self.clustering_km(processed_data, n_cluster)
         else:
@@ -521,6 +503,7 @@ class Process_data:
                 #     processed_data= clustering_km(processed_data)
         print("kmeans clustering: ", time.process_time() - start3)
         self.stage = 'creating bar chart '
+        print(self.stage + "....")
         start4 = time.process_time()
         all_arguments = [item for sublist in arguments for item in sublist]
         frequency = np.array([])
@@ -541,6 +524,7 @@ class Process_data:
         print("bar chart(argument frequency): ", time.process_time() - start4)
         #correlation matrix
         self.stage = "creating correlation matrix"
+        print(self.stage + "....")
         start5 = time.process_time()
         all_occurence=pd.DataFrame([x for x in processed_data['in']], columns=[str(x) for x in itemlist])
         to_drop = bar_data.loc[bar_data['rate'].isin([0, 100])].argument
@@ -552,6 +536,7 @@ class Process_data:
         print("4.progress chldren{}, super{}".format(os.getpid(), os.getppid()))
         #find features:
         self.stage = "find identifiers"
+        print(self.stage + "....")
         start6 = time.process_time()
         common_all = set(arguments[0]).intersection(*arguments)
         cluster_feature_db=self.find_feature_cluster(common_all,processed_data,"db")
@@ -565,6 +550,7 @@ class Process_data:
         cluster_feature_km.to_pickle(dir + "km_cluster_feature.pkl")
         print("create feature report: ", time.process_time() - start6)
         self.stage='store processed data'
+        print(self.stage + "....")
         processed_data.to_pickle(dir + "processed_data.pkl")
         bar_data["argument"]=[str(x)+"argument" for x in itemlist]
         bar_data.to_pickle(dir + "bar_data.pkl")
@@ -599,6 +585,7 @@ class Process_data:
     def initial_process_individual(self,dir, arguments_file, answer_sets,semantic):
         start = time.process_time()
         self.stage='data preprocess: extraction and transformation'
+        print(self.stage + "....")
         with open(arguments_file, 'r') as file:
             question = file.read()
         itemlist = [s for s in re.findall(r"arg[(]a(.*?)[)].", question)]
@@ -694,6 +681,7 @@ class Process_data:
         start2 = time.process_time()
         processed_data=pd.read_pickle(dir+semantic+'_processed_data.pkl')
         self.stage='bayesian optimization on DBscan '
+        print(self.stage + "....")
         if use_optim:
 
             eps,minpts = bayesian_optimization(processed_data, 'dbscan')
@@ -725,6 +713,7 @@ class Process_data:
         #     processed_data= clustering_km(processed_data)
         #
         self.stage = 'bayesian optimization on Kmeans '
+        print(self.stage + "....")
         if use_optim:
 
             n_cluster = bayesian_optimization(processed_data, 'kmeans')
@@ -737,6 +726,7 @@ class Process_data:
         print("kmeans clustering: ", time.process_time() - start3)
         start4 = time.process_time()
         self.stage='creating bar chart'
+        print(self.stage + "....")
         all_arguments = [item for sublist in arguments for item in sublist]
         frequency = np.array([])
         for argument in itemlist:
@@ -757,6 +747,7 @@ class Process_data:
         #correlation matrix
         start5 = time.process_time()
         self.stage="creating correlation matrix"
+        print(self.stage + "....")
         all_occurence=pd.DataFrame([x for x in processed_data['in']], columns=[str(x) for x in itemlist])
         to_drop = bar_data.loc[bar_data['rate'].isin([0, 100])].argument
         all_occurence.drop([str(x) for x in to_drop], axis='columns', inplace=True)
@@ -768,6 +759,7 @@ class Process_data:
         #find features:
         start6 = time.process_time()
         self.stage = "find identifiers"
+        print(self.stage + "....")
         common_all = set(arguments[0]).intersection(*arguments)
         cluster_feature_db=self.find_feature_cluster(common_all,processed_data,"db")
         cluster_feature_km=self.find_feature_cluster(common_all,processed_data,"km")
@@ -780,6 +772,7 @@ class Process_data:
         cluster_feature_km.to_pickle(processed_data_dir + "_km_cluster_feature.pkl")
         print("create feature report: ", time.process_time() - start6)
         self.stage = "storing processed data"
+        print(self.stage + "....")
         processed_data.to_pickle(processed_data_dir + "_processed_data.pkl")
         bar_data["argument"]=[str(x)+"argument" for x in itemlist]
         bar_data.to_pickle(processed_data_dir + "_bar_data.pkl")
