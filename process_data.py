@@ -471,19 +471,12 @@ class Process_data:
         #     else:
         #         processed_data = clustering_dbscan(processed_data)
         print("dbscan clustering: ", time.process_time() - start2)
-        reducible = True
-        for i in range(0, len(list(processed_data['in']))): 
-            print(list(processed_data['in'])[i].shape) 
-            if (list(processed_data['in'])[i].shape[0] < 2): 
-                reducible = False
         
-        if reducible:
-            processed_data = self.dimensional_reduction(processed_data)
-            y = np.array([np.array(xi) for xi in transfered])    #to change and test###############减少需要内存大小
-            processed_data =self.dimensional_reduction_autoencoding(y, processed_data)
-            #processed_data =dimensional_reduction_autoencoding(for_auto_reduction, processed_data)
-        else: 
-            print('cannot reduce data')
+        processed_data = self.dimensional_reduction(processed_data)
+        y = np.array([np.array(xi) for xi in transfered])    #to change and test###############减少需要内存大小
+        processed_data =self.dimensional_reduction_autoencoding(y, processed_data)
+        #processed_data =dimensional_reduction_autoencoding(for_auto_reduction, processed_data)
+    
         
         start3 = time.process_time()
         if use_optim:
