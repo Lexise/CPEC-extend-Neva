@@ -73,3 +73,6 @@ conflicting(X) :- att_new(X,Y), out(X), in(Y).
 conflicting(X) :- att_new(X,X).
 :- not conflicting(X), out(X), arg_new(X).
 
+
+
+#show in/1.

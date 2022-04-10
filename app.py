@@ -638,7 +638,9 @@ def global_individual(eps, minpts, n_cluster, use_optim, semantics):
         for a_semantic in semantics:
 
             if len(extensions) == 0:
-                extension=process_individual_semantics.process_extension_individual(question, a_semantic, PROCESSED_DIRECTORY, UPLOAD_DIRECTORY, EXTENSION_DIR, ASP_DIR)
+                extension, computing_states=process_individual_semantics.process_extension_individual(question, a_semantic, PROCESSED_DIRECTORY, UPLOAD_DIRECTORY, EXTENSION_DIR, ASP_DIR)
+                if computing_states =="oversize":
+                    return html.Div(['computed extensions oversized'])
             else:
                 extension = process_individual_semantics.find_semantic_files(extensions, a_semantic)
 

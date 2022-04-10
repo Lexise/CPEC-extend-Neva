@@ -80,7 +80,7 @@ class Process_data:
 
             end = "SEMI-STB"
         elif item == 'cf2':
-            asp_encoding = "cf2_web.dl"
+            asp_encoding = "cf2.dl"
             end = "CF2"
         # elif item == 'stage2':
         #     asp_encoding = "stage2_web.txt"
@@ -90,9 +90,9 @@ class Process_data:
         extension_file = "{}.EE_{}".format(question, end)
         self.stage='extension computing of a single semantics'
         print(self.stage + "....")
-        compute_extensions(upload_dir +question,aps_dir+asp_encoding,extenion_dir+extension_file)
+        compute_states=compute_extensions(upload_dir +question,aps_dir+asp_encoding,extenion_dir+extension_file)
 
-        return extension_file
+        return extension_file,compute_states
 
     def find_semantic_files(files,item):#find corresponding extension file
         if item == 'stable':
